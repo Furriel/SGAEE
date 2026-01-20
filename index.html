@@ -13,59 +13,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
-        /* Configurações de Impressão */
-        @media print {
-            @page {
-                size: A4;
-                margin: 0;
-                /* A margem é controlada pelo padding do .report-page */
-            }
 
-            body,
-            html {
-                background: white;
-                height: auto !important;
-                overflow: visible !important;
-            }
-
-            /* Esconde TUDO por padrão */
-            body * {
-                visibility: hidden;
-            }
-
-            /* Mostra apenas a folha do relatório e seus filhos */
-            .report-page,
-            .report-page * {
-                visibility: visible;
-            }
-
-            /* Posiciona a folha no topo absoluto para ocupar o PDF inteiro */
-            .report-page {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100% !important;
-                margin: 0 !important;
-                padding: 3cm 2cm 2cm 3cm !important;
-                /* Mantém margem ABNT */
-                box-shadow: none !important;
-                border: none !important;
-                page-break-after: always;
-            }
-
-            /* Garante que nada interfira no fluxo */
-            .no-print,
-            nav,
-            header,
-            .sidebar,
-            #root>div>div {
-                display: none !important;
-            }
-        }
 
         body {
             font-family: 'Roboto', 'Segoe UI', sans-serif;
@@ -567,7 +521,13 @@
                         <strong>Série/Turma:</strong> {student.grade} &nbsp;&nbsp; | &nbsp;&nbsp; <strong>Necessidade:</strong> {student.needs}<br />
                         <strong>Período Avaliado:</strong> {checklist?.period || 'Semestre Atual'}
                     </div>
-                    <div className="abnt-text outline-none min-h-[400px]" contentEditable={true} suppressContentEditableWarning={true} dangerouslySetInnerHTML={{ __html: htmlContent }}></div>
+                    <div
+                        className="abnt-text outline-none"
+                        contentEditable={true}
+                        suppressContentEditableWarning={true}
+                        dangerouslySetInnerHTML={{ __html: htmlContent }}
+                    >
+                    </div>
 
                     <div className="mt-auto pt-12 flex justify-between items-end break-inside-avoid px-8">
                         <div className="text-center w-5/12">
@@ -586,10 +546,137 @@
             );
         };
 
+        // 1. FUNÇÃO AUXILIAR: Gera o conteúdo APENAS do corpo para um aluno
+        const buildStudentContent = (student, diagnosis, checklist, logs) => {
+            let body = [];
+
+            // Tabela de Cabeçalho do Aluno
+            body.push({
+                style: 'tableExample',
+                table: {
+                    widths: ['*', 'auto'],
+                    body: [
+                        [{ text: `Estudante: ${student.name}`, bold: true }, { text: `Nasc: ${formatDate(student.birthDate)} (${calculateAge(student.birthDate)})`, alignment: 'right' }],
+                        [{ text: `Série: ${student.grade}`, bold: true }, { text: `Necessidade: ${student.needs}`, alignment: 'right' }],
+                        [{ text: `Período: ${checklist?.period || 'Semestre Atual'}`, colSpan: 2, bold: true }, {}]
+                    ]
+                },
+                layout: 'noBorders',
+                margin: [0, 0, 0, 20]
+            });
+
+            // Texto Gerado (Lógica original)
+            let textParts = [];
+            textParts.push(`O(A) estudante ${student.name}, matriculado(a) na série ${student.grade}, com indicativo de ${student.needs || 'necessidade específica'}, frequenta o Atendimento Educacional Especializado (AEE) desde ${formatDate(student.entryDate)}.`);
+            textParts.push(`O presente relatório tem como objetivo descrever o desenvolvimento do(a) estudante nas áreas cognitiva, acadêmica, psicomotora e social, comparando a avaliação inicial com o momento atual.`);
+
+            DIAGNOSIS_AREAS.forEach(area => {
+                let items = area.items.map(item => {
+                    const valInit = diagnosis?.[item.key];
+                    const valCurr = checklist?.[item.key];
+                    if (valInit && valCurr && valInit !== 'nao_observado') {
+                        const lblInit = LEVEL_CONFIG[valInit]?.label.split(' (')[0].toLowerCase();
+                        const lblCurr = LEVEL_CONFIG[valCurr]?.label.split(' (')[0].toLowerCase();
+                        if (valInit !== valCurr) return `em ${item.label.toLowerCase()}, inicialmente encontrava-se ${lblInit}, e atualmente observa-se que está ${lblCurr}, evidenciando evolução`;
+                        else return `em ${item.label.toLowerCase()}, mantém-se ${lblInit}, necessitando de continuidade nas estratégias`;
+                    } else if (valCurr && valCurr !== 'nao_observado') {
+                        return `em relação à ${item.label.toLowerCase()}, observa-se que encontra-se ${LEVEL_CONFIG[valCurr].label.split(' (')[0].toLowerCase()}`;
+                    }
+                    return null;
+                }).filter(Boolean);
+                if (items.length > 0) textParts.push(`No que tange aos ${area.title.replace(/^\d+\.\s/, '').toLowerCase()}, ${items.join('; ')}.`);
+            });
+
+            textParts.push(`Durante o período, foram realizados ${logs.length} atendimentos. O trabalho pedagógico focou em estratégias lúdicas e estruturadas, visando o desenvolvimento integral do(a) aluno(a).`);
+            textParts.push(`Sugere-se a continuidade do atendimento no contraturno, bem como a parceria constante com a família e a escola regular para generalização das habilidades trabalhadas.`);
+            textParts.push(`O Atendimento Educacional Especializado tem caráter complementar e suplementar ao ensino regular.`);
+
+            // Adiciona parágrafos ao corpo
+            textParts.forEach(p => body.push({ text: p, style: 'bodyText', margin: [0, 0, 0, 10] }));
+
+            return body;
+        };
+
+        // 2. FUNÇÃO MESTRA: Gera o Documento PDF (Aceita Lista ou Único)
+        const generateMasterPDF = (studentsList, diagnoses, checklists, logs, settings, filterTitle = "") => {
+            if (!studentsList || studentsList.length === 0) return;
+
+            const fullContent = [];
+
+            // Título Geral (só aparece na capa se for lote, ou no topo se for individual)
+            if (studentsList.length > 1) {
+                fullContent.push({ text: `CADERNO DE RELATÓRIOS - ${filterTitle.toUpperCase()}`, style: 'coverTitle', margin: [0, 100, 0, 0], pageBreak: 'after' });
+            }
+
+            // Loop para empilhar os relatórios
+            studentsList.forEach((student, index) => {
+                const sDiag = diagnoses.find(d => d.studentId === student.id);
+                const sCheck = checklists.filter(c => c.studentId === student.id).pop();
+                const sLogs = logs.filter(l => l.studentId === student.id);
+
+                // Adiciona Título do Relatório
+                fullContent.push({ text: 'RELATÓRIO DE DESENVOLVIMENTO INDIVIDUAL', style: 'title', margin: [0, 0, 0, 20] });
+
+                // Adiciona Conteúdo do Aluno
+                fullContent.push(...buildStudentContent(student, sDiag, sCheck, sLogs));
+
+                // Rodapé e Assinaturas (Repetido para cada aluno)
+                fullContent.push({ text: 'Nota: Esta avaliação possui caráter pedagógico, não clínico, conforme diretrizes do AEE.', style: 'note', margin: [0, 30, 0, 0] });
+                fullContent.push({
+                    unbreakable: true,
+                    margin: [0, 50, 0, 0],
+                    columns: [
+                        { stack: [{ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0 }] }, { text: settings.teacherName || 'Professor(a) AEE', style: 'signature' }, { text: 'Docente AEE', style: 'signatureRole' }] },
+                        { stack: [{ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0 }] }, { text: settings.coordinatorName || 'Coordenação', style: 'signature' }, { text: 'Equipe Gestora', style: 'signatureRole' }] }
+                    ]
+                });
+                fullContent.push({ text: `Gerado em ${formatDate(getTodayDate())}`, style: 'smallDate', alignment: 'center', margin: [0, 20, 0, 0] });
+
+                // Quebra de página (Exceto para o último)
+                if (index < studentsList.length - 1) {
+                    fullContent.push({ text: '', pageBreak: 'after' });
+                }
+            });
+
+            // Definição do PDF
+            const docDefinition = {
+                pageSize: 'A4',
+                pageMargins: [60, 80, 40, 60],
+                header: {
+                    margin: [40, 20, 40, 0],
+                    stack: [
+                        { text: settings.schoolName || 'NOME DA ESCOLA', style: 'headerSchool' },
+                        { text: 'ATENDIMENTO EDUCACIONAL ESPECIALIZADO - AEE', style: 'headerSub' },
+                        { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 515, y2: 5, lineWidth: 1 }] }
+                    ]
+                },
+                content: fullContent,
+                styles: {
+                    headerSchool: { fontSize: 12, bold: true, alignment: 'center' },
+                    headerSub: { fontSize: 9, alignment: 'center' },
+                    coverTitle: { fontSize: 22, bold: true, alignment: 'center' },
+                    title: { fontSize: 14, bold: true, alignment: 'center', decoration: 'underline' },
+                    bodyText: { fontSize: 11, alignment: 'justify', lineHeight: 1.5 },
+                    note: { fontSize: 9, italics: true, color: '#555' },
+                    signature: { fontSize: 10, bold: true, alignment: 'center', margin: [0, 5, 0, 0] },
+                    signatureRole: { fontSize: 9, alignment: 'center', color: '#555' },
+                    smallDate: { fontSize: 8, color: '#aaa' }
+                }
+            };
+
+            const fileName = studentsList.length > 1 ? `Relatorio_Lote_${filterTitle.replace(/[^a-z0-9]/gi, '_')}.pdf` : `Relatorio_${studentsList[0].name.replace(/\s+/g, '_')}.pdf`;
+            pdfMake.createPdf(docDefinition).download(fileName);
+        };
+
+
         // --- APP PRINCIPAL ---
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [toast, setToast] = useState(null);
+            // ... outros states ...
+            const [reportMode, setReportMode] = useState('individual'); // 'individual' ou 'batch'
+            const [batchType, setBatchType] = useState('grade'); // 'grade' (série) ou 'needs' (deficiência)
+            const [batchValue, setBatchValue] = useState(''); // Valor selecionado do filtro
 
             // Dados
             const [students, setStudents] = useState([]);
@@ -915,89 +1002,97 @@
                             )}
 
                             {activeTab === 'reports' && (
-                                <div className="h-full flex flex-col">
-                                    <h2 className="text-2xl font-bold text-slate-800 mb-6 no-print">Central de Relatórios</h2>
+                                <div className="space-y-6 fade-in h-full">
+                                    <h2 className="text-2xl font-bold text-slate-800">Relatórios Oficiais (PDF)</h2>
 
-                                    {/* Controles Superiores (Configurações) */}
-                                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 no-print fade-in">
-                                        <div className="flex flex-wrap items-end gap-6">
-                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">ESCOLA</label><input className="border p-2 rounded w-64" value={settings.schoolName} onChange={e => setSettings({ ...settings, schoolName: e.target.value })} /></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">PROFESSOR(A)</label><input className="border p-2 rounded w-48" value={settings.teacherName} onChange={e => setSettings({ ...settings, teacherName: e.target.value })} /></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">COORDENAÇÃO</label><input className="border p-2 rounded w-48" value={settings.coordinatorName} onChange={e => setSettings({ ...settings, coordinatorName: e.target.value })} /></div>
-                                            <div className="h-10 border-r border-slate-200 mx-2"></div>
-                                            <div className="flex items-center gap-4"><button onClick={() => setBatchMode(!batchMode)} className={`px-4 py-2 rounded-lg font-bold transition-colors ${batchMode ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}><Icons.Layers /> {batchMode ? 'Modo Lote Ativo' : 'Ativar Modo Lote'}</button></div>
+                                    {/* Configurações Globais */}
+                                    <Card title="Configuração do Cabeçalho">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">Nome da Escola</label><input className="border p-2 rounded w-full bg-slate-50" value={settings.schoolName || ''} onChange={e => setSettings({ ...settings, schoolName: e.target.value })} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">Professor(a)</label><input className="border p-2 rounded w-full bg-slate-50" value={settings.teacherName || ''} onChange={e => setSettings({ ...settings, teacherName: e.target.value })} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">Coordenação</label><input className="border p-2 rounded w-full bg-slate-50" value={settings.coordinatorName || ''} onChange={e => setSettings({ ...settings, coordinatorName: e.target.value })} /></div>
                                         </div>
-                                        {batchMode && <div className="mt-6 pt-6 border-t border-slate-100 flex items-center gap-4 slide-in"><button onClick={() => handlePrint('Caderno_Relatorios')} className="bg-indigo-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-indigo-700 h-10 mt-5 shadow-lg flex items-center gap-2"><Icons.Download /> IMPRIMIR CADERNO ({getBatchStudents().length} Alunos)</button></div>}
-                                    </div>
+                                    </Card>
 
-                                    {!batchMode ? (
-                                        <div className="fade-in flex flex-col items-center pb-20">
-                                            <div className="w-full max-w-5xl">
-                                                <StudentSelect />
-                                            </div>
+                                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                                        {/* SELETOR DE MODO */}
+                                        <div className="flex justify-center gap-6 mb-8 border-b border-slate-200 pb-6">
+                                            <label className={`cursor-pointer px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all ${reportMode === 'individual' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>
+                                                <input type="radio" name="mode" className="hidden" checked={reportMode === 'individual'} onChange={() => setReportMode('individual')} />
+                                                <Icons.Users /> Individual
+                                            </label>
+                                            <label className={`cursor-pointer px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all ${reportMode === 'batch' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>
+                                                <input type="radio" name="mode" className="hidden" checked={reportMode === 'batch'} onChange={() => setReportMode('batch')} />
+                                                <Icons.Layers /> Em Lote (Agrupado)
+                                            </label>
+                                        </div>
 
-                                            {selectedStudentId ? (
-                                                <div className="w-full flex flex-col items-center gap-6">
-
-                                                    {/* 1. DICA ABNT (Agora no Topo) */}
-                                                    <div className="w-full max-w-[210mm] bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800 flex items-center gap-3 no-print">
-                                                        <Icons.Info />
-                                                        <span><strong>Dica ABNT:</strong> O texto abaixo é editável! Clique sobre ele para realizar ajustes finos antes de salvar.</span>
+                                        {/* CONTROLES DE FILTRO */}
+                                        <div className="max-w-xl mx-auto">
+                                            {reportMode === 'individual' ? (
+                                                <StudentSelect label="SELECIONE O ALUNO:" />
+                                            ) : (
+                                                <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-fade-in">
+                                                    <div className="flex gap-4 mb-4">
+                                                        <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                                                            <input type="radio" checked={batchType === 'grade'} onChange={() => { setBatchType('grade'); setBatchValue(''); }} className="text-indigo-600 focus:ring-indigo-500" /> Por Série/Turma
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                                                            <input type="radio" checked={batchType === 'needs'} onChange={() => { setBatchType('needs'); setBatchValue(''); }} className="text-indigo-600 focus:ring-indigo-500" /> Por Deficiência
+                                                        </label>
                                                     </div>
 
-                                                    {/* 2. RELATÓRIO (Agora centralizado e sem cortes) */}
-                                                    {/* O overflow-x-auto permite rolar se a tela for pequena, sem cortar o conteudo */}
-                                                    <div className="w-full overflow-x-auto flex justify-center py-4 bg-slate-300/50 rounded-xl border border-slate-300 shadow-inner">
-                                                        <div id="report-preview-container">
-                                                            <ReportPaper
-                                                                student={students.find(s => s.id === selectedStudentId)}
-                                                                diagnosis={diagnoses.find(d => d.studentId === selectedStudentId)}
-                                                                checklist={checklists.filter(c => c.studentId === selectedStudentId).pop()}
-                                                                logs={logs.filter(l => l.studentId === selectedStudentId)}
-                                                                settings={settings}
-                                                            />
+                                                    <select className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 font-medium mb-2" value={batchValue} onChange={e => setBatchValue(e.target.value)}>
+                                                        <option value="">-- Selecione o grupo --</option>
+                                                        {[...new Set(students.map(s => batchType === 'grade' ? s.grade : s.needs))].filter(Boolean).sort().map(val => (
+                                                            <option key={val} value={val}>{val}</option>
+                                                        ))}
+                                                    </select>
+
+                                                    {batchValue && (
+                                                        <div className="text-xs text-center text-slate-500 mt-2">
+                                                            {students.filter(s => (batchType === 'grade' ? s.grade : s.needs) === batchValue).length} aluno(s) encontrado(s).
                                                         </div>
-                                                    </div>
-
-                                                    {/* 3. BOTÃO SALVAR (Agora no Final) */}
-                                                    <div className="w-full max-w-[210mm] no-print mt-4">
-                                                        <button
-                                                            onClick={() => handlePrint(students.find(s => s.id === selectedStudentId)?.name)}
-                                                            className="bg-slate-800 hover:bg-slate-900 text-white w-full py-4 rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-[0.99] text-lg"
-                                                        >
-                                                            <Icons.Download /> SALVAR PDF / IMPRIMIR
-                                                        </button>
-                                                        <p className="text-center text-xs text-slate-500 mt-2">
-                                                            Ao clicar, selecione "Salvar como PDF" na janela de impressão do navegador.
-                                                        </p>
-                                                    </div>
-
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <EmptyState icon={Icons.FileText} message="Selecione um aluno" submessage="Para visualizar o relatório individual." />
                                             )}
+
+                                            {/* BOTÃO DE AÇÃO */}
+                                            <div className="mt-8 text-center">
+                                                <button
+                                                    onClick={() => {
+                                                        let targetStudents = [];
+                                                        let filterName = "";
+
+                                                        if (reportMode === 'individual') {
+                                                            if (selectedStudentId) {
+                                                                targetStudents = [students.find(s => s.id === selectedStudentId)];
+                                                                filterName = targetStudents[0].name;
+                                                            }
+                                                        } else {
+                                                            if (batchValue) {
+                                                                targetStudents = students.filter(s => (batchType === 'grade' ? s.grade : s.needs) === batchValue);
+                                                                filterName = `${batchType === 'grade' ? 'Turma' : 'Grupo'} ${batchValue}`;
+                                                            }
+                                                        }
+
+                                                        if (targetStudents.length > 0 && targetStudents[0]) {
+                                                            generateMasterPDF(targetStudents, diagnoses, checklists, logs, settings, filterName);
+                                                        } else {
+                                                            showToast('Selecione um aluno ou grupo válido.', 'error');
+                                                        }
+                                                    }}
+                                                    disabled={reportMode === 'individual' ? !selectedStudentId : !batchValue}
+                                                    className={`px-8 py-4 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex items-center gap-3 text-lg mx-auto ${(reportMode === 'individual' ? selectedStudentId : batchValue)
+                                                            ? 'bg-red-600 hover:bg-red-700 text-white cursor-pointer'
+                                                            : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                        }`}
+                                                >
+                                                    <Icons.Download /> {reportMode === 'individual' ? 'BAIXAR PDF INDIVIDUAL' : 'BAIXAR CADERNO PDF'}
+                                                </button>
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <div className="fade-in">
-                                            {getBatchStudents().length > 0 ? (
-                                                <div className="w-full bg-slate-300 p-8 rounded-xl overflow-auto shadow-inner space-y-8 flex flex-col items-center" id="report-preview-container">
-                                                    {getBatchStudents().map(student => (
-                                                        <ReportPaper
-                                                            key={student.id}
-                                                            student={student}
-                                                            diagnosis={diagnoses.find(d => d.studentId === student.id)}
-                                                            checklist={checklists.filter(c => c.studentId === student.id).pop()}
-                                                            logs={logs.filter(l => l.studentId === student.id)}
-                                                            settings={settings}
-                                                            isBatch={true}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <EmptyState icon={Icons.Users} message="Nenhum aluno encontrado" submessage="Tente mudar o filtro de série." />
-                                            )}
-                                        </div>
-                                    )}
+                                    </div>
                                 </div>
                             )}
 
