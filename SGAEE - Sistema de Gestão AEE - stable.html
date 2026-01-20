@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGAEE - Sistema de Gestão AEE </title>
+    
+    <!-- React, Tailwind e SheetJS (Excel) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+        /* Configurações de Impressão */
+        @media print {
+            @page { 
+                size: A4; 
+                margin: 0;
+            }
+            body { 
+                background: white; 
+                -webkit-print-color-adjust: exact; 
+                margin: 0;
+                padding: 0;
+            }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            
+            .report-page { 
+                page-break-after: always; 
+                width: 100%;
+                min-height: 100vh;
+                position: relative;
+                padding: 3cm 2cm 2cm 3cm !important; /* Margens ABNT */
+                box-sizing: border-box;
+            }
+            .report-page:last-child { page-break-after: auto; }
+            
+            #report-preview-container {
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                max-width: none !important;
+                background: white !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+            
+            #root, main, .flex { 
+                display: block !important; 
+                height: auto !important; 
+                overflow: visible !important; 
+                width: 100% !important;
+            }
+        }
+
+        body { font-family: 'Roboto', 'Segoe UI', sans-serif; background-color: #f1f5f9; }
+        
+        /* Animações */
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .slide-in-right { animation: slideInRight 0.3s ease-out; }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Folha A4 na tela (Preview) */
+        .a4-paper {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 3cm 2cm 2cm 3cm; /* Margens ABNT */
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            color: black;
+            box-sizing: border-box;
+        }
+
+        /* Tipografia ABNT */
+        .abnt-text {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            text-align: justify;
+            color: #000;
+        }
+        .abnt-text p {
+            text-indent: 1.25cm;
+            margin-bottom: 0;
+            margin-top: 0;
+        }
+        .abnt-text p + p {
+            margin-top: 6pt; 
+        }
+
+        .abnt-title {
+            font-family: 'Arial', sans-serif;
+            font-size: 12pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 1.5cm;
+        }
+        
+        .abnt-header {
+            font-family: 'Arial', sans-serif;
+            font-size: 12pt;
+            font-weight: bold;
+            text-align: center;
+            text-transform: uppercase;
+            margin-bottom: 1cm;
+        }
+
+        [contenteditable]:empty:before {
+            content: attr(placeholder);
+            color: #9ca3af;
+            cursor: text;
+        }
+        [contenteditable]:focus {
+            outline: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- ÍCONES ---
+        const Icons = {
+            Brain: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>,
+            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+            ClipboardList: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>,
+            Activity: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
+            LayoutDashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+            Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            Trash2: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+            Lightbulb: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
+            Database: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+            Sheet: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h4"/></svg>,
+            Layers: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+            Code: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+            Info: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
+            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+            Circle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>,
+            Flag: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>,
+            ArrowRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>,
+            PieChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+        };
+
+        // --- CONFIGURAÇÃO DO DIAGNÓSTICO ---
+        const DIAGNOSIS_AREAS = [
+            { id: 'cognitivo', title: '1. Aspectos Cognitivos', color: 'bg-blue-50 border-blue-200', items: [{ key: 'atencao', label: 'Atenção e Foco' }, { key: 'memoria', label: 'Memória' }, { key: 'raciocinio', label: 'Raciocínio Lógico' }, { key: 'compreensao', label: 'Compreensão de Comandos' }] },
+            { id: 'academico', title: '2. Linguagem e Acadêmico', color: 'bg-green-50 border-green-200', items: [{ key: 'oralidade', label: 'Comunicação Oral' }, { key: 'leitura', label: 'Leitura' }, { key: 'escrita', label: 'Escrita' }, { key: 'matematica', label: 'Matemática' }] },
+            { id: 'motor', title: '3. Aspectos Psicomotores', color: 'bg-orange-50 border-orange-200', items: [{ key: 'motora_fina', label: 'Coordenação Fina' }, { key: 'motora_global', label: 'Coordenação Global' }, { key: 'esquema', label: 'Esquema Corporal' }, { key: 'lateralidade', label: 'Lateralidade' }] },
+            { id: 'social', title: '4. Social e Emocional', color: 'bg-purple-50 border-purple-200', items: [{ key: 'interacao', label: 'Interação c/ Pares' }, { key: 'regras', label: 'Respeito às Regras' }, { key: 'autonomia', label: 'Autonomia' }, { key: 'frustracao', label: 'Lida c/ Frustração' }] }
+        ];
+
+        const LEVEL_CONFIG = {
+            'nao_observado': { label: 'Não Observado', color: 'bg-slate-100', score: 0 },
+            'nao_desenvolvido': { label: 'Não Desenvolvido', color: 'bg-red-100', score: 1 },
+            'em_desenvolvimento': { label: 'Em Desenvolvimento', color: 'bg-yellow-100', score: 2 },
+            'consolidado': { label: 'Consolidado', color: 'bg-green-100', score: 3 }
+        };
+
+        // --- BANCO DE ESTRATÉGIAS (RESTAURADO COMPLETO V11) ---
+        const strategiesDB = {
+            'Atencao': [ 'Jogo da Memória temático.', 'Quebra-cabeça progressivo.', 'Atividade "Encontre o Erro".', 'Sequenciamento lógico.', 'Uso de timer visual.', 'Caça ao tesouro sensorial.', 'Jogos de Lince ou "Wally".', 'Classificação por cor/forma.', 'Pareamento de sombras.', 'Labirintos.', 'Jogo da estátua.', 'Repetição de sequências sonoras.', 'Memória de trabalho auditiva.', 'Atividades de alinhavo.' ],
+            'Leitura': [ 'Associação imagem-palavra.', 'Leitura compartilhada.', 'Caça-palavras.', 'Alfabeto Móvel.', 'Bingo de sílabas.', 'Leitura fatiada.', 'Sussurrofone.', 'Dominó de palavras.', 'Banco de palavras.', 'Leitura de rótulos.', 'Jogos de rima.', 'Pareamento figura-letra inicial.', 'Construção de frases.', 'Aplicativos de alfabetização.' ],
+            'Matematica': [ 'Contagem concreta.', 'Jogos de trilha.', 'Material Dourado.', 'Mercadinho simbólico.', 'Classificação por atributos.', 'Quebra-cabeça numérico.', 'Régua numérica.', 'Bingo de números.', 'Receita culinária.', 'Jogos de cartas.', 'Tangram.', 'Sequência com calendário.', 'Situações-problema ilustradas.', 'Uso de calculadora.' ],
+            'Motor': [ 'Alinhavo.', 'Massinha de modelar.', 'Transposição de grãos/água.', 'Rasgadura e colagem.', 'Circuito motor simples.', 'Recorte de linhas.', 'Pintura a dedo.', 'Encaixe de pinos.', 'Abotoar/desabotoar.', 'Caixa de areia.', 'Amassar papel.', 'Tesoura com mola.', 'Pega Varetas.', 'Colar adesivos.' ],
+            'Social': [ 'Jogos cooperativos.', 'Histórias sociais.', 'Reconhecimento de emoções.', 'Dramatização (teatrinho).', 'Brincadeira dirigida.', 'Construção de regras.', 'Mímica.', 'Identificação de expressões.', 'Faz de Conta.', 'Compartilhamento.', 'Treino de contato visual.', 'Comunicação alternativa.', 'Rodinha de conversa.', 'Jogos de regras.' ],
+            'AVD': [ 'Amarrar sapatos.', 'Painel de atividades (ziper).', 'Organização da mochila.', 'Higiene das mãos.', 'Servir lanche.', 'Vestuário e clima.', 'Uso do banheiro.', 'Escovação de dentes.', 'Limpar a mesa.', 'Uso de dinheiro.', 'Abrir potes.', 'Uso de talheres.', 'Itens de higiene.', 'Agenda visual.' ]
+        };
+        
+        // Mapeamento para sugestão do Gráfico (De Área Genérica para Específica do Banco)
+        const areaToStrategyMap = {
+            'Cognitivo': 'Atencao',
+            'Academico': 'Leitura', // Simplificação: se for Acadêmico, sugere Leitura. Poderia randomizar com Matematica.
+            'Motor': 'Motor',
+            'Social': 'Social'
+        };
+
+        // --- UTILITÁRIOS ---
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+        const formatDate = (dateString) => { if (!dateString) return '-'; const [y, m, d] = dateString.split('T')[0].split('-'); return `${d}/${m}/${y}`; };
+        const getTodayDate = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; };
+        const getLabel = (val) => LEVEL_CONFIG[val]?.label || val || '-';
+        const calculateAge = (b) => { if(!b) return '-'; const t = new Date(); const d = new Date(b); let a = t.getFullYear() - d.getFullYear(); const m = t.getMonth() - d.getMonth(); if (m < 0 || (m === 0 && t.getDate() < d.getDate())) a--; return a + ' anos'; };
+
+        // --- COMPONENTES UI ---
+        const Toast = ({ message, type, onClose }) => {
+            useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
+            return <div className={`fixed bottom-6 right-6 px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 slide-in z-50 text-white font-medium ${type === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>{type === 'success' ? <Icons.Check /> : <Icons.Info />}{message}</div>;
+        };
+
+        const Card = ({ children, title, color = "bg-slate-50 border-slate-100", action }) => (
+            <div className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6 no-print`}>
+                <div className={`px-6 py-4 border-b ${color} flex justify-between items-center`}><span className="font-semibold text-slate-700">{title}</span>{action}</div>
+                <div className="p-6">{children}</div>
+            </div>
+        );
+
+        const EmptyState = ({ icon: Icon, message, submessage }) => (
+            <div className="text-center py-12 px-4 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-slate-400">
+                <div className="mb-4 p-4 bg-white rounded-full shadow-sm"><Icon /></div><h3 className="text-slate-600 font-semibold mb-1">{message}</h3><p className="text-sm">{submessage}</p>
+            </div>
+        );
+
+        const DiagnosisItem = ({ label, value, onChange }) => (
+            <div className="mb-4">
+                <label className="block text-sm font-bold text-slate-700 mb-1">{label}</label>
+                <select 
+                    className={`w-full p-2 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-indigo-500 ${LEVEL_CONFIG[value]?.color || ''}`} 
+                    value={value} 
+                    onChange={(e) => onChange(e.target.value)}
+                >
+                    {Object.entries(LEVEL_CONFIG).map(([key, config]) => (
+                        <option key={key} value={key}>{config.label}</option>
+                    ))}
+                </select>
+            </div>
+        );
+
+        const FlowTracker = ({ student, currentStage, onStepClick }) => {
+            if (!student) return null;
+            const OFFICIAL_FLOW_STEPS = [
+                { id: 1, label: "Cadastro", description: "Entrada" },
+                { id: 2, label: "Avaliação Inicial", description: "Mapeamento" },
+                { id: 3, label: "Atendimento", description: "Registros" },
+                { id: 4, label: "Evolução", description: "Comparativo" },
+                { id: 5, label: "Relatório", description: "Final" }
+            ];
+
+            return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8 slide-in-right relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Icons.Flag /></div>
+                    <h3 className="text-lg font-bold text-slate-700 mb-1 flex items-center gap-2">
+                         <span className="bg-indigo-100 text-indigo-700 p-1 rounded"><Icons.Activity /></span> 
+                         Fluxo Pedagógico: {student.name}
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-6">Acompanhe a etapa atual do estudante.</p>
+                    <div className="relative flex flex-col md:flex-row justify-between items-center w-full z-10 gap-4 md:gap-0">
+                        <div className="hidden md:block absolute top-1/2 left-0 w-full h-1 bg-slate-100 -translate-y-1/2 z-0 rounded"></div>
+                        {OFFICIAL_FLOW_STEPS.map((step, index) => {
+                            const isCompleted = index < currentStage;
+                            const isCurrent = index === currentStage;
+                            let circleClass = isCompleted ? "bg-green-100 text-green-600 border-2 border-green-500" : isCurrent ? "bg-indigo-600 text-white border-4 border-indigo-100 shadow-lg scale-110" : "bg-slate-100 text-slate-400 border-2 border-slate-200";
+                            return (
+                                <div key={step.id} className="relative z-10 flex flex-col items-center group cursor-pointer w-full md:w-auto" onClick={() => onStepClick(step.id)}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${circleClass}`}>{isCompleted ? <Icons.CheckCircle /> : <span className="text-xs font-bold">{step.id}</span>}</div>
+                                    <div className={`mt-3 text-xs uppercase tracking-wide text-center transition-colors ${isCompleted ? "text-green-700 font-medium" : isCurrent ? "text-indigo-700 font-bold" : "text-slate-400"}`}>{step.label}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- COMPONENTE DE GRÁFICOS E ANÁLISE ---
+        const ChartsTab = ({ studentId, diagnoses, checklists, onGenerateLog }) => {
+            const chartCanvasRef = useRef(null);
+            const chartInstanceRef = useRef(null);
+            const [analysis, setAnalysis] = useState('');
+            const [suggestion, setSuggestion] = useState(null);
+
+            const calculateAreaAvg = (data, areaItems) => {
+                if (!data) return 0;
+                let sum = 0;
+                let count = 0;
+                areaItems.forEach(item => {
+                    const val = data[item.key];
+                    if (val && LEVEL_CONFIG[val]) {
+                        sum += LEVEL_CONFIG[val].score;
+                        count++;
+                    }
+                });
+                return count > 0 ? (sum / count) : 0;
+            };
+
+            const processData = () => {
+                const diag = diagnoses.find(d => d.studentId === studentId);
+                const check = checklists.filter(c => c.studentId === studentId).pop(); // Pega a última evolução
+                
+                const labels = ["Cognitivo", "Acadêmico", "Motor", "Social"];
+                
+                // Calcula médias
+                const dataInitial = DIAGNOSIS_AREAS.map(area => calculateAreaAvg(diag, area.items));
+                const dataCurrent = DIAGNOSIS_AREAS.map(area => calculateAreaAvg(check, area.items));
+                
+                // Análise Automática
+                let text = [];
+                let weakestArea = { name: '', val: 4, index: -1 };
+
+                DIAGNOSIS_AREAS.forEach((area, idx) => {
+                    const initVal = dataInitial[idx];
+                    const currVal = check ? dataCurrent[idx] : initVal;
+                    const diff = currVal - initVal;
+
+                    if (check) {
+                        if (diff > 0.5) text.push(`Na área de <strong>${area.title.substring(3)}</strong>, houve evolução positiva.`);
+                        else if (diff === 0) text.push(`Em <strong>${area.title.substring(3)}</strong>, o quadro mantém-se estável.`);
+                        else if (diff < 0) text.push(`Atenção para <strong>${area.title.substring(3)}</strong>, onde houve leve regressão nos indicadores.`);
+                    }
+
+                    // Identificar área mais fraca atual
+                    if (currVal < weakestArea.val && currVal < 3) {
+                        weakestArea = { name: labels[idx], val: currVal, index: idx };
+                    }
+                });
+
+                if (!check) text = ["Realize uma Avaliação Evolutiva para visualizar o comparativo de progresso."];
+                else if (text.length === 0) text = ["O aluno apresenta desenvolvimento constante em todas as áreas."];
+
+                setAnalysis(text.join(" "));
+
+                // Gerar Sugestão Baseada na Fraqueza
+                if (weakestArea.name) {
+                    // Mapeia da área fraca do gráfico para uma chave do banco detalhado
+                    const strategyKey = areaToStrategyMap[weakestArea.name] || 'Atencao';
+                    
+                    // Se for Acadêmico, sorteia entre Leitura e Matemática para variar
+                    let finalKey = strategyKey;
+                    if (weakestArea.name === 'Acadêmico') {
+                         finalKey = Math.random() > 0.5 ? 'Leitura' : 'Matematica';
+                    }
+
+                    const strategies = strategiesDB[finalKey] || [];
+                    const randomStrat = strategies.sort(() => 0.5 - Math.random()).slice(0, 3);
+                    
+                    setSuggestion({
+                        area: weakestArea.name,
+                        strategies: randomStrat,
+                        objectiveKey: finalKey
+                    });
+                } else {
+                    setSuggestion(null);
+                }
+
+                return { labels, dataInitial, dataCurrent: check ? dataCurrent : dataInitial };
+            };
+
+            useEffect(() => {
+                if (!studentId || !chartCanvasRef.current) return;
+                
+                const { labels, dataInitial, dataCurrent } = processData();
+
+                if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+
+                chartInstanceRef.current = new Chart(chartCanvasRef.current, {
+                    type: 'radar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Avaliação Inicial',
+                                data: dataInitial,
+                                fill: true,
+                                backgroundColor: 'rgba(148, 163, 184, 0.2)',
+                                borderColor: 'rgb(148, 163, 184)',
+                                pointBackgroundColor: 'rgb(148, 163, 184)',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: 'rgb(148, 163, 184)'
+                            },
+                            {
+                                label: 'Evolução Atual',
+                                data: dataCurrent,
+                                fill: true,
+                                backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                                borderColor: 'rgb(79, 70, 229)',
+                                pointBackgroundColor: 'rgb(79, 70, 229)',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: 'rgb(79, 70, 229)'
+                            }
+                        ]
+                    },
+                    options: {
+                        elements: { line: { borderWidth: 3 } },
+                        scales: {
+                            r: {
+                                angleLines: { display: true },
+                                suggestedMin: 0,
+                                suggestedMax: 3,
+                                ticks: { stepSize: 1, display: false } // Esconde números para limpar
+                            }
+                        }
+                    }
+                });
+
+                return () => { if (chartInstanceRef.current) chartInstanceRef.current.destroy(); };
+            }, [studentId, diagnoses, checklists]);
+
+            if (!studentId) return <EmptyState icon={Icons.PieChart} message="Selecione um aluno" submessage="Para visualizar os gráficos de evolução." />;
+
+            return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 fade-in">
+                    {/* COLUNA 1: GRÁFICO */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><Icons.Activity/> Mapa de Desenvolvimento</h3>
+                        <div className="relative h-80 w-full flex justify-center">
+                            <canvas ref={chartCanvasRef} />
+                        </div>
+                        <div className="mt-4 text-center text-xs text-slate-400">Escala: 0 (Não Obs) a 3 (Consolidado)</div>
+                    </div>
+
+                    {/* COLUNA 2: INTELIGÊNCIA */}
+                    <div className="space-y-6">
+                        {/* ANÁLISE AUTOMÁTICA */}
+                        <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-xl">
+                            <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Icons.Brain/> Análise Descritiva</h3>
+                            <p className="text-sm text-indigo-900 leading-relaxed" dangerouslySetInnerHTML={{__html: analysis}}></p>
+                        </div>
+
+                        {/* GERADOR DE ATIVIDADES */}
+                        {suggestion && (
+                            <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-5"><Icons.Lightbulb/></div>
+                                <h3 className="font-bold text-slate-700 mb-2">Sugestão de Atividade</h3>
+                                <p className="text-xs text-slate-500 mb-4">Baseado na área de maior necessidade: <strong className="uppercase">{suggestion.area}</strong></p>
+                                
+                                <ul className="space-y-2 mb-6">
+                                    {suggestion.strategies.map((s, i) => (
+                                        <li key={i} className="text-sm text-slate-600 flex gap-2"><div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-teal-500"></div>{s}</li>
+                                    ))}
+                                </ul>
+
+                                <button 
+                                    onClick={() => onGenerateLog(suggestion)}
+                                    className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Icons.ClipboardList/> Criar Registro no Diário
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- COMPONENTE RELATÓRIO ---
+        const ReportPaper = ({ student, diagnosis, checklist, logs, settings, isBatch = false }) => {
+            const generateText = () => {
+                if(!student) return '';
+                let d = diagnosis || {};
+                let c = checklist || {};
+                let html = `<p>O(A) estudante <strong>${student.name}</strong>, matriculado(a) na série <strong>${student.grade}</strong>, com indicativo de <strong>${student.needs || 'necessidade específica'}</strong>, frequenta o Atendimento Educacional Especializado (AEE) desde ${formatDate(student.entryDate)}.</p>`;
+                html += `<p>O presente relatório tem como objetivo descrever o desenvolvimento do(a) estudante nas áreas cognitiva, acadêmica, psicomotora e social, comparando a avaliação inicial com o momento atual.</p>`;
+                DIAGNOSIS_AREAS.forEach(area => {
+                    let items = area.items.map(item => {
+                        const valInit = d[item.key];
+                        const valCurr = c[item.key];
+                        if (valInit && valCurr && valInit !== 'nao_observado') {
+                            const lblInit = LEVEL_CONFIG[valInit]?.label.split(' (')[0].toLowerCase();
+                            const lblCurr = LEVEL_CONFIG[valCurr]?.label.split(' (')[0].toLowerCase();
+                            if (valInit !== valCurr) return `em <strong>${item.label.toLowerCase()}</strong>, inicialmente encontrava-se <em>${lblInit}</em>, e atualmente observa-se que está <em>${lblCurr}</em>, evidenciando evolução`;
+                            else return `em <strong>${item.label.toLowerCase()}</strong>, mantém-se <em>${lblInit}</em>, necessitando de continuidade nas estratégias`;
+                        } else if (valCurr && valCurr !== 'nao_observado') {
+                             return `em relação à <strong>${item.label.toLowerCase()}</strong>, observa-se que encontra-se <em>${LEVEL_CONFIG[valCurr].label.split(' (')[0].toLowerCase()}</em>`;
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    if(items.length > 0) html += `<p>No que tange aos <strong>${area.title.replace(/^\d+\.\s/, '').toLowerCase()}</strong>, ${items.join('; ')}.</p>`;
+                });
+                html += `<p>Durante o período, foram realizados <strong>${logs.length} atendimentos</strong>. O trabalho pedagógico focou em estratégias lúdicas e estruturadas, visando o desenvolvimento integral do(a) aluno(a).</p>`;
+                html += `<p>Sugere-se a continuidade do atendimento no contraturno, bem como a parceria constante com a família e a escola regular para generalização das habilidades trabalhadas.</p>`;
+                html += `<p style="margin-top: 1cm;">O Atendimento Educacional Especializado tem caráter complementar e suplementar ao ensino regular.</p>`;
+                html += `<p style="font-size: 10pt; font-style: italic; color: #555;">Nota: Esta avaliação possui caráter pedagógico, não clínico, conforme diretrizes do AEE.</p>`;
+                return html;
+            };
+
+            const [htmlContent, setHtmlContent] = useState('');
+            useEffect(() => { setHtmlContent(generateText()); }, [student, diagnosis, checklist, logs]);
+
+            return (
+                <div className={`a4-paper report-page ${isBatch ? '' : 'shadow-lg'} bg-white text-black`}>
+                    <div className="abnt-header">
+                        <div>{settings.schoolName || 'NOME DA ESCOLA'}</div>
+                        <div className="text-sm font-normal mt-1">ATENDIMENTO EDUCACIONAL ESPECIALIZADO - AEE</div>
+                    </div>
+                    <div className="abnt-title">RELATÓRIO DE DESENVOLVIMENTO INDIVIDUAL</div>
+                    <div className="mb-6 text-sm font-arial leading-relaxed border p-4 rounded border-gray-300">
+                        <strong>Estudante:</strong> {student.name}<br/>
+                        <strong>Data Nasc:</strong> {student.birthDate ? formatDate(student.birthDate) : '-'} ({calculateAge(student.birthDate)})<br/>
+                        <strong>Série/Turma:</strong> {student.grade} &nbsp;&nbsp; | &nbsp;&nbsp; <strong>Necessidade:</strong> {student.needs}<br/>
+                        <strong>Período Avaliado:</strong> {checklist?.period || 'Semestre Atual'}
+                    </div>
+                    <div className="abnt-text outline-none min-h-[400px]" contentEditable={true} suppressContentEditableWarning={true} dangerouslySetInnerHTML={{ __html: htmlContent }}></div>
+                    <div className="mt-auto pt-16 flex justify-between items-end break-inside-avoid">
+                        <div className="text-center w-5/12"><div className="border-t border-black mb-2"></div><p className="font-bold text-sm uppercase">{settings.teacherName || 'Professor(a)'}</p><p className="text-xs">Professor(a) do AEE</p></div>
+                        <div className="text-center w-5/12"><div className="border-t border-black mb-2"></div><p className="font-bold text-sm uppercase">{settings.coordinatorName || 'Coordenador(a)'}</p><p className="text-xs">Coordenação Pedagógica / AEE</p></div>
+                    </div>
+                    <div className="text-center text-[10px] mt-8 text-gray-500">Documento gerado em {formatDate(getTodayDate())}</div>
+                </div>
+            );
+        };
+
+        // --- APP PRINCIPAL ---
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [toast, setToast] = useState(null);
+            
+            // Dados
+            const [students, setStudents] = useState([]);
+            const [diagnoses, setDiagnoses] = useState([]);
+            const [logs, setLogs] = useState([]);
+            const [checklists, setChecklists] = useState([]);
+            const [settings, setSettings] = useState({ schoolName: '', teacherName: '', coordinatorName: '' });
+            
+            // Forms e Estados
+            const [newStudent, setNewStudent] = useState({});
+            const [selectedStudentId, setSelectedStudentId] = useState('');
+            const [newLog, setNewLog] = useState({});
+            const [newChecklist, setNewChecklist] = useState({ period: '', evaluator: '' });
+            const [batchMode, setBatchMode] = useState(false);
+            const [batchFilter, setBatchFilter] = useState('');
+            
+            // Estado para Log Pré-preenchido (Vindo do Gráfico)
+            const [prefillLogData, setPrefillLogData] = useState(null);
+
+            useEffect(() => {
+                const load = (key) => JSON.parse(localStorage.getItem('aee_' + key) || '[]');
+                setStudents(load('students')); setDiagnoses(load('diagnoses')); setLogs(load('logs')); setChecklists(load('checklists'));
+                setSettings(JSON.parse(localStorage.getItem('aee_settings') || '{}'));
+            }, []);
+
+            useEffect(() => {
+                const save = (key, data) => localStorage.setItem('aee_' + key, JSON.stringify(data));
+                save('students', students); save('diagnoses', diagnoses); save('logs', logs); save('checklists', checklists);
+                localStorage.setItem('aee_settings', JSON.stringify(settings));
+            }, [students, diagnoses, logs, checklists, settings]);
+
+            // Efeito para pré-preencher log quando mudar de aba
+            useEffect(() => {
+                if (activeTab === 'logs' && prefillLogData) {
+                    setNewLog({
+                        date: getTodayDate(),
+                        objective: prefillLogData.objectiveKey,
+                        strategy: "Estratégias sugeridas pela análise gráfica:\n" + prefillLogData.strategies.map(s => `- ${s}`).join('\n')
+                    });
+                    setPrefillLogData(null); // Limpa após usar
+                }
+            }, [activeTab, prefillLogData]);
+
+            const showToast = (msg, type = 'success') => setToast({ message: msg, type });
+
+            // Funções de Dados
+            const calculateScore = (dataObj) => {
+                if (!dataObj) return 0;
+                return Object.keys(dataObj).filter(k => LEVEL_CONFIG[dataObj[k]]).reduce((acc, k) => acc + LEVEL_CONFIG[dataObj[k]].score, 0);
+            };
+
+            const handleAddStudent = () => {
+                if (!newStudent.name) return showToast('Nome obrigatório', 'error');
+                const newId = generateId();
+                setStudents([...students, { id: newId, entryDate: getTodayDate(), ...newStudent }]);
+                setNewStudent({}); setSelectedStudentId(newId); showToast('Aluno salvo!');
+            };
+
+            const handleDeleteStudent = (id) => {
+                if(confirm("Tem certeza que deseja apagar este aluno e todos os dados dele?")) {
+                    setStudents(students.filter(s => s.id !== id)); setDiagnoses(diagnoses.filter(d => d.studentId !== id)); setLogs(logs.filter(l => l.studentId !== id)); setChecklists(checklists.filter(c => c.studentId !== id));
+                    if(selectedStudentId === id) setSelectedStudentId(''); showToast('Aluno removido.');
+                }
+            };
+            
+            const handleSaveDiagnosis = (field, value) => {
+                if(!selectedStudentId) return;
+                const existing = diagnoses.find(d => d.studentId === selectedStudentId) || { studentId: selectedStudentId };
+                const updated = { ...existing, date: getTodayDate(), [field]: value };
+                setDiagnoses([...diagnoses.filter(d => d.studentId !== selectedStudentId), updated]);
+            };
+
+            const handleAddLog = () => {
+                if(!selectedStudentId || !newLog.objective) return showToast('Preencha Objetivo e Estratégia', 'error');
+                setLogs([...logs, { id: generateId(), studentId: selectedStudentId, date: newLog.date || getTodayDate(), ...newLog }]);
+                setNewLog({}); showToast('Atendimento registrado!');
+            };
+
+            const handleSuggestStrategy = () => {
+                if (!newLog.objective) return showToast("Selecione um Eixo/Objetivo primeiro.", 'error');
+                const list = strategiesDB[newLog.objective] || [];
+                setNewLog({ ...newLog, strategy: list.sort(() => 0.5 - Math.random()).slice(0, 3).map(s => `- ${s}`).join('\n') });
+            };
+
+            const handleAddChecklist = () => {
+                if(!selectedStudentId || !newChecklist.period) return showToast('Informe o Período', 'error');
+                const currentDiag = diagnoses.find(d => d.studentId === selectedStudentId) || {};
+                const checklistData = { id: generateId(), studentId: selectedStudentId, date: getTodayDate(), ...newChecklist, ...currentDiag };
+                delete checklistData._id; 
+                setChecklists([...checklists, checklistData]);
+                setNewChecklist({ period: '', evaluator: '' }); showToast('Avaliação salva!');
+            };
+
+            const handlePrint = (studentName) => {
+                const originalTitle = document.title;
+                const safeName = studentName ? studentName.replace(/[^a-z0-9]/gi, '_').trim() : 'Lote_AEE';
+                document.title = `Relatorio_${safeName}_${getTodayDate()}`;
+                window.print();
+                setTimeout(() => document.title = originalTitle, 1000);
+            };
+
+            const handleGenerateLogFromChart = (suggestionData) => {
+                setPrefillLogData(suggestionData);
+                setActiveTab('logs');
+                showToast("Redirecionando para o Diário...");
+            };
+
+            const getStudentStage = (id) => {
+                if (!id) return 0;
+                const hasDiag = diagnoses.some(d => d.studentId === id && Object.keys(d).length > 2);
+                const hasLogs = logs.some(l => l.studentId === id);
+                const hasCheck = checklists.some(c => c.studentId === id);
+                if (hasCheck) return 4;
+                if (hasLogs) return 3;
+                if (hasDiag) return 2;
+                return 1;
+            };
+
+            const handleFlowClick = (stepId) => {
+                const map = { 1: 'students', 2: 'diagnosis', 3: 'logs', 4: 'checklists', 5: 'reports' };
+                if (map[stepId]) setActiveTab(map[stepId]);
+            };
+
+            const getBatchStudents = () => (!batchFilter || batchFilter === 'Todos') ? students : students.filter(s => s.grade && s.grade.includes(batchFilter));
+            const uniqueGrades = [...new Set(students.map(s => s.grade))].filter(Boolean).sort();
+
+            const StudentSelect = ({ label = "SELECIONE O ALUNO:" }) => (
+                <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print">
+                    <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2 text-indigo-600"><Icons.Users/> {label}</label>
+                    <select className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 font-medium" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
+                        <option value="">-- Clique aqui para selecionar --</option>
+                        {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.grade})</option>)}
+                    </select>
+                </div>
+            );
+
+            // Export Helpers (Restaurados)
+            const exportExcel = () => {
+                try {
+                    const wb = XLSX.utils.book_new();
+                    const dataStudents = students.map(s => ({ "ID": s.id, "Nome": s.name, "Nascimento": s.birthDate, "Série": s.grade, "Necessidade": s.needs, "Data Entrada": formatDate(s.entryDate) }));
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataStudents), "Alunos");
+                    const dataDiag = diagnoses.map(d => {
+                        const s = students.find(x => x.id === d.studentId);
+                        const entry = { "Data": formatDate(d.date), "Aluno": s ? s.name : "Removido" };
+                        DIAGNOSIS_AREAS.forEach(area => { area.items.forEach(item => { entry[item.label] = getLabel(d[item.key]); }); });
+                        return entry;
+                    });
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataDiag), "Avaliações Iniciais");
+                    const dataLogs = logs.map(l => {
+                        const s = students.find(x => x.id === l.studentId);
+                        return { "Data": formatDate(l.date), "Aluno": s ? s.name : "Removido", "Objetivo": l.objective, "Estratégia": l.strategy, "Obs": l.observation };
+                    });
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataLogs), "Atendimentos");
+                    XLSX.writeFile(wb, "Relatorio_Geral_AEE.xlsx");
+                    showToast('Planilha gerada com sucesso!');
+                } catch (e) { showToast('Erro ao gerar Excel.', 'error'); }
+            };
+
+            const downloadBackup = () => {
+                const data = { students, diagnoses, logs, checklists, settings };
+                const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `Backup_AEE_${getTodayDate()}.json`;
+                link.click();
+                showToast('Backup baixado!');
+            };
+
+            const uploadBackup = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if(confirm("Isso substituirá os dados atuais. Continuar?")) {
+                            setStudents(data.students || []); setDiagnoses(data.diagnoses || []); setLogs(data.logs || []); setChecklists(data.checklists || []); setSettings(data.settings || {}); showToast('Dados restaurados!');
+                        }
+                    } catch(err) { showToast('Arquivo inválido.', 'error'); }
+                };
+                reader.readAsText(file);
+            };
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+                    <div className="w-64 bg-slate-900 text-slate-300 flex flex-col no-print shadow-xl z-20">
+                        <div className="p-6 flex items-center gap-3 text-white border-b border-slate-800">
+                            <Icons.Brain /> 
+                            <div><span className="font-bold text-lg block leading-none tracking-tight">Gestão AEE</span><span className="text-[10px] uppercase font-bold text-indigo-400">Versão 13.0 (Completa)</span></div>
+                        </div>
+                        <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+                            {[
+                                {id: 'dashboard', label: 'Visão Geral', icon: Icons.LayoutDashboard},
+                                {id: 'students', label: 'Alunos', icon: Icons.Users},
+                                {id: 'diagnosis', label: 'Avaliação Inicial', icon: Icons.Search},
+                                {id: 'logs', label: 'Diário', icon: Icons.ClipboardList},
+                                {id: 'checklists', label: 'Evolução', icon: Icons.Activity},
+                                {id: 'charts', label: 'Gráficos e Análise', icon: Icons.PieChart},
+                                {id: 'reports', label: 'Relatórios', icon: Icons.FileText},
+                                {id: 'settings', label: 'Backup / Dados', icon: Icons.Database},
+                                {id: 'about', label: 'Sobre o Dev', icon: Icons.Code},
+                            ].map(item => (
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg translate-x-1' : 'hover:bg-slate-800 hover:text-white'}`}>
+                                    <item.icon /> {item.label}
+                                </button>
+                            ))}
+                        </nav>
+                        <div className="p-4 border-t border-slate-800 text-center text-xs text-slate-600">Armazenamento 100% Local</div>
+                    </div>
+
+                    <main className="flex-1 overflow-auto bg-slate-100 relative">
+                        <div className="max-w-5xl mx-auto p-8 fade-in min-h-full pb-20">
+                            
+                            {activeTab === 'dashboard' && (
+                                <div className="space-y-8">
+                                    <header><h2 className="text-3xl font-bold text-slate-800">Painel de Controle</h2><p className="text-slate-500 mt-1">Gerencie o fluxo pedagógico.</p></header>
+                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                        <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.ArrowRight /> Acompanhamento do Fluxo Oficial</h3>
+                                        <div className="bg-white p-4 rounded-xl border border-slate-200 mb-4"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">Selecione um aluno:</label><select className="w-full p-2 border border-slate-300 rounded-lg bg-slate-50" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}><option value="">-- Selecione --</option>{students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.grade})</option>)}</select></div>
+                                        {selectedStudentId ? <FlowTracker student={students.find(s => s.id === selectedStudentId)} currentStage={getStudentStage(selectedStudentId)} onStepClick={handleFlowClick}/> : <div className="text-center py-6 text-slate-400 text-sm italic bg-white rounded-xl border border-dashed border-slate-200">Selecione um aluno acima para ver a linha do tempo.</div>}
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('students')}><div className="p-4 bg-indigo-100 text-indigo-600 rounded-xl"><Icons.Users/></div><div><div className="text-3xl font-bold text-slate-800">{students.length}</div><div className="text-sm font-medium text-slate-500">Alunos</div></div></div>
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('logs')}><div className="p-4 bg-teal-100 text-teal-600 rounded-xl"><Icons.ClipboardList/></div><div><div className="text-3xl font-bold text-slate-800">{logs.length}</div><div className="text-sm font-medium text-slate-500">Atendimentos</div></div></div>
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('charts')}><div className="p-4 bg-purple-100 text-purple-600 rounded-xl"><Icons.PieChart/></div><div><div className="text-3xl font-bold text-slate-800">Análise</div><div className="text-sm font-medium text-slate-500">Ver Gráficos</div></div></div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'students' && (
+                                <div className="space-y-6">
+                                    <header><h2 className="text-2xl font-bold text-slate-800">Alunos</h2></header>
+                                    <Card title="Novo Cadastro">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: Maria Souza" value={newStudent.name || ''} onChange={e => setNewStudent({...newStudent, name: e.target.value})} /></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Data de Nascimento</label><input type="date" className="w-full border p-3 rounded-lg bg-slate-50" value={newStudent.birthDate || ''} onChange={e => setNewStudent({...newStudent, birthDate: e.target.value})} /></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Série</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: 3º Ano B" value={newStudent.grade || ''} onChange={e => setNewStudent({...newStudent, grade: e.target.value})} /></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Necessidade Educacional Específica</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: TEA, TDAH..." value={newStudent.needs || ''} onChange={e => setNewStudent({...newStudent, needs: e.target.value})} /></div>
+                                        </div>
+                                        <button onClick={handleAddStudent} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors w-full md:w-auto justify-center"><Icons.Save/> Cadastrar Aluno</button>
+                                    </Card>
+                                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-50 border-b text-slate-500 text-sm uppercase"><tr><th className="p-4">Nome</th><th className="p-4">Idade</th><th className="p-4">Série</th><th className="p-4">Necessidade</th><th className="p-4 text-right">Ação</th></tr></thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {students.map(s => <tr key={s.id} className="hover:bg-slate-50"><td className="p-4 font-medium">{s.name}</td><td className="p-4">{calculateAge(s.birthDate)}</td><td className="p-4">{s.grade}</td><td className="p-4"><span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{s.needs}</span></td><td className="p-4 text-right"><button onClick={() => handleDeleteStudent(s.id)} className="text-red-400 p-2"><Icons.Trash2/></button></td></tr>)}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'diagnosis' && (
+                                <div className="space-y-6">
+                                    <header><h2 className="text-2xl font-bold text-slate-800">Avaliação Pedagógica Inicial</h2></header>
+                                    <StudentSelect />
+                                    {selectedStudentId ? <div className="fade-in space-y-6">
+                                        <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-center gap-3 text-sm"><Icons.Info /> <strong>Instrução:</strong> Marque o nível inicial do aluno.</div>
+                                        {DIAGNOSIS_AREAS.map(area => {
+                                            const currentDiagnosis = diagnoses.find(d => d.studentId === selectedStudentId) || {};
+                                            return <Card key={area.id} title={area.title} color={area.color}><div className="grid grid-cols-1 md:grid-cols-2 gap-6">{area.items.map(item => <DiagnosisItem key={item.key} label={item.label} value={currentDiagnosis[item.key] || 'nao_observado'} onChange={(val) => handleSaveDiagnosis(item.key, val)} />)}</div></Card>
+                                        })}
+                                    </div> : <EmptyState icon={Icons.Search} message="Selecione um aluno" submessage="Para iniciar o mapeamento." />}
+                                </div>
+                            )}
+
+                            {activeTab === 'logs' && (
+                                <div className="space-y-6">
+                                    <header><h2 className="text-2xl font-bold text-slate-800">Diário de Atendimento</h2></header>
+                                    <StudentSelect />
+                                    {selectedStudentId ? <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 fade-in">
+                                        <div className="lg:col-span-1 space-y-6">
+                                            <Card title="Novo Registro">
+                                                <div className="space-y-4">
+                                                    <div><label className="text-xs font-bold text-slate-500 uppercase">Data</label><input type="date" className="w-full border p-2 rounded bg-slate-50" value={newLog.date || ''} onChange={e => setNewLog({...newLog, date: e.target.value})} /></div>
+                                                    <div><label className="text-xs font-bold text-slate-500 uppercase">Eixo</label><select className="w-full border p-2 rounded bg-slate-50" value={newLog.objective || ''} onChange={e => setNewLog({...newLog, objective: e.target.value})}><option value="">Selecione...</option><option value="Atencao">Atenção e F. Executivas</option><option value="Leitura">Leitura e Escrita</option><option value="Matematica">Matemática</option><option value="Motor">Coordenação Motora</option><option value="Social">Social</option><option value="AVD">Autonomia (AVD)</option></select></div>
+                                                    <div><div className="flex justify-between mb-1"><label className="text-xs font-bold text-slate-500 uppercase">Estratégia</label><button onClick={handleSuggestStrategy} className="text-xs text-indigo-600 font-bold hover:underline flex gap-1"><Icons.Lightbulb/> Sugerir</button></div><textarea className="w-full border p-2 rounded h-24 text-sm bg-slate-50" value={newLog.strategy || ''} onChange={e => setNewLog({...newLog, strategy: e.target.value})} placeholder="Descrição..."></textarea></div>
+                                                    <button onClick={handleAddLog} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-lg font-bold transition-colors">Registrar</button>
+                                                </div>
+                                            </Card>
+                                        </div>
+                                        <div className="lg:col-span-2">
+                                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 h-full overflow-y-auto max-h-[800px]">
+                                                <h3 className="font-bold text-slate-700 mb-4">Histórico</h3>
+                                                <div className="space-y-4">{logs.filter(l => l.studentId === selectedStudentId).map(l => <div key={l.id} className="p-4 bg-slate-50 rounded-lg border border-slate-100 flex flex-col gap-2"><div className="flex justify-between items-center border-b border-slate-200 pb-2"><span className="font-bold text-slate-800 text-sm flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-teal-500"></div> {formatDate(l.date)}</span><span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-1 rounded border uppercase">{l.objective}</span></div><p className="text-slate-600 text-sm whitespace-pre-line">{l.strategy}</p></div>)}</div>
+                                            </div>
+                                        </div>
+                                    </div> : <EmptyState icon={Icons.Search} message="Selecione um aluno" submessage="Para registrar atendimentos." />}
+                                </div>
+                            )}
+
+                            {activeTab === 'charts' && (
+                                <div className="space-y-6">
+                                    <header><h2 className="text-2xl font-bold text-slate-800">Gráficos e Análise Inteligente</h2></header>
+                                    <StudentSelect />
+                                    <ChartsTab studentId={selectedStudentId} diagnoses={diagnoses} checklists={checklists} onGenerateLog={handleGenerateLogFromChart} />
+                                </div>
+                            )}
+
+                            {activeTab === 'checklists' && (
+                                <div className="space-y-6">
+                                    <header><h2 className="text-2xl font-bold text-slate-800">Avaliação Evolutiva</h2></header>
+                                    <StudentSelect />
+                                    {selectedStudentId ? <div className="fade-in space-y-6">
+                                        <Card title="Nova Avaliação">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                                <div><label className="text-xs font-bold text-slate-500 uppercase">Período</label><input className="w-full border p-2 rounded bg-slate-50" placeholder="Ex: 2º Semestre" value={newChecklist.period || ''} onChange={e => setNewChecklist({...newChecklist, period: e.target.value})} /></div>
+                                                <div><label className="text-xs font-bold text-slate-500 uppercase">Avaliador</label><input className="w-full border p-2 rounded bg-slate-50" placeholder="Nome" value={newChecklist.evaluator || ''} onChange={e => setNewChecklist({...newChecklist, evaluator: e.target.value})} /></div>
+                                            </div>
+                                            <button onClick={handleAddChecklist} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold shadow-lg transition-colors">Salvar Avaliação Evolutiva</button>
+                                        </Card>
+                                        <div className="space-y-4">
+                                            {checklists.filter(c => c.studentId === selectedStudentId).map(c => {
+                                                const diff = calculateScore(c) - calculateScore(diagnoses.find(d => d.studentId === selectedStudentId));
+                                                return <div key={c.id} className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm"><div className="flex justify-between items-center mb-2"><span className="font-bold text-indigo-700">{c.period}</span><span className="text-xs text-slate-500">{formatDate(c.date)}</span></div><div className="flex justify-between items-center mt-2"><div className="text-xs text-slate-600">Pontuação Global: {calculateScore(c)} pts</div><div className={`text-xs font-bold px-2 py-1 rounded uppercase ${diff > 5 ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>{diff > 5 ? "Evolução Significativa" : "Estável / Parcial"}</div></div></div>
+                                            })}
+                                        </div>
+                                    </div> : <EmptyState icon={Icons.Search} message="Selecione um aluno" submessage="Para realizar uma reavaliação." />}
+                                </div>
+                            )}
+
+                            {activeTab === 'reports' && (
+                                <div className="h-full">
+                                    <h2 className="text-2xl font-bold text-slate-800 mb-6 no-print">Central de Relatórios</h2>
+                                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8 no-print fade-in">
+                                        <div className="flex flex-wrap items-end gap-6">
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">ESCOLA</label><input className="border p-2 rounded w-64" value={settings.schoolName} onChange={e => setSettings({...settings, schoolName: e.target.value})} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">PROFESSOR(A)</label><input className="border p-2 rounded w-48" value={settings.teacherName} onChange={e => setSettings({...settings, teacherName: e.target.value})} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">COORDENAÇÃO</label><input className="border p-2 rounded w-48" value={settings.coordinatorName} onChange={e => setSettings({...settings, coordinatorName: e.target.value})} /></div>
+                                            <div className="h-10 border-r border-slate-200 mx-2"></div>
+                                            <div className="flex items-center gap-4"><button onClick={() => setBatchMode(!batchMode)} className={`px-4 py-2 rounded-lg font-bold transition-colors ${batchMode ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}><Icons.Layers/> {batchMode ? 'Modo Lote Ativo' : 'Ativar Modo Lote'}</button></div>
+                                        </div>
+                                        {batchMode && <div className="mt-6 pt-6 border-t border-slate-100 flex items-center gap-4 slide-in"><button onClick={() => handlePrint('Caderno_Relatorios')} className="bg-indigo-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-indigo-700 h-10 mt-5 shadow-lg flex items-center gap-2"><Icons.Download/> IMPRIMIR CADERNO ({getBatchStudents().length} Alunos)</button></div>}
+                                    </div>
+                                    {!batchMode ? (
+                                        <div className="fade-in">
+                                            <StudentSelect />
+                                            {selectedStudentId ? <div className="flex flex-col lg:flex-row gap-8 items-start"><div className="flex-1 w-full bg-slate-300 p-8 rounded-xl overflow-auto shadow-inner" id="report-preview-container"><ReportPaper student={students.find(s => s.id === selectedStudentId)} diagnosis={diagnoses.find(d => d.studentId === selectedStudentId)} checklist={checklists.filter(c => c.studentId === selectedStudentId).pop()} logs={logs.filter(l => l.studentId === selectedStudentId)} settings={settings} /></div><div className="w-full lg:w-64 no-print flex flex-col gap-4"><div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800"><Icons.Info/> <strong>Dica ABNT:</strong><br/>O texto é editável! Clique sobre ele para ajustar antes de imprimir.</div><button onClick={() => handlePrint(students.find(s => s.id === selectedStudentId)?.name)} className="bg-slate-800 hover:bg-slate-900 text-white w-full py-4 rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95"><Icons.Download/> SALVAR PDF</button></div></div> : <EmptyState icon={Icons.FileText} message="Selecione um aluno" submessage="Para visualizar o relatório individual." />}
+                                        </div>
+                                    ) : (
+                                        <div className="fade-in">{getBatchStudents().length > 0 ? <div className="w-full bg-slate-300 p-8 rounded-xl overflow-auto shadow-inner space-y-8" id="report-preview-container">{getBatchStudents().map(student => <ReportPaper key={student.id} student={student} diagnosis={diagnoses.find(d => d.studentId === student.id)} checklist={checklists.filter(c => c.studentId === student.id).pop()} logs={logs.filter(l => l.studentId === student.id)} settings={settings} isBatch={true} />)}</div> : <EmptyState icon={Icons.Users} message="Nenhum aluno encontrado" submessage="Tente mudar o filtro de série." />}</div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'settings' && (
+                                <div className="space-y-6">
+                                    <header><h2 className="text-2xl font-bold text-slate-800">Segurança de Dados</h2></header>
+                                    <Card title="Backup e Exportação">
+                                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6 text-yellow-800 text-sm flex gap-2"><Icons.Info/> Lembre-se: Seus dados estão salvos apenas neste computador. Faça backup frequentemente.</div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 shadow-md transition-colors"><Icons.Sheet/><span className="text-sm">EXPORTAR PLANILHA</span></button>
+                                            <button onClick={downloadBackup} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 shadow-md transition-colors"><Icons.Download/><span className="text-sm">BAIXAR BACKUP</span></button>
+                                            <label className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"><Icons.Upload/><span className="text-sm">RESTAURAR</span><input type="file" accept=".json" onChange={uploadBackup} className="hidden" /></label>
+                                        </div>
+                                    </Card>
+                                </div>
+                            )}
+
+                            {/* ABOUT (SOBRE) - RESTAURADO */}
+                            {activeTab === 'about' && (
+                                <div className="space-y-6 fade-in">
+                                    <header><h2 className="text-2xl font-bold text-slate-800">Sobre o Desenvolvedor</h2></header>
+                                    <div className="bg-white rounded-2xl shadow-xl overflow-hidden max-w-2xl mx-auto">
+                                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white text-center">
+                                            <div className="w-24 h-24 bg-white rounded-full mx-auto mb-4 flex items-center justify-center text-indigo-600 shadow-lg">
+                                                <Icons.Code />
+                                            </div>
+                                            <h1 className="text-3xl font-bold">Gustavo Rocha Furriel</h1>
+                                            <p className="opacity-90">Desenvolvedor Full Stack</p>
+                                        </div>
+                                        <div className="p-8 text-center space-y-6">
+                                            <p className="text-slate-600 leading-relaxed">
+                                                Este sistema foi desenvolvido com dedicação para auxiliar professores do AEE na gestão e acompanhamento de seus alunos, simplificando a burocracia para focar no que realmente importa: o desenvolvimento humano.
+                                            </p>
+                                            <div className="text-xs text-slate-400 pt-4">
+                                                &copy; {new Date().getFullYear()} SGAEE v13.0 (Completa). Todos os direitos reservados.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
