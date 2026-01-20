@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SGAEE - Sistema de Gestão AEE </title>
-    
+
     <!-- React, Tailwind e SheetJS (Excel) -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -12,74 +13,122 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
         /* Configurações de Impressão */
         @media print {
-            @page { 
-                size: A4; 
+            @page {
+                size: A4;
                 margin: 0;
+                /* A margem é controlada pelo padding do .report-page */
             }
-            body { 
-                background: white; 
-                -webkit-print-color-adjust: exact; 
-                margin: 0;
-                padding: 0;
-            }
-            .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            
-            .report-page { 
-                page-break-after: always; 
-                width: 100%;
-                min-height: 100vh;
-                position: relative;
-                padding: 3cm 2cm 2cm 3cm !important; /* Margens ABNT */
-                box-sizing: border-box;
-            }
-            .report-page:last-child { page-break-after: auto; }
-            
-            #report-preview-container {
-                padding: 0 !important;
-                margin: 0 !important;
-                box-shadow: none !important;
-                width: 100% !important;
-                max-width: none !important;
-                background: white !important;
+
+            body,
+            html {
+                background: white;
                 height: auto !important;
                 overflow: visible !important;
             }
-            
-            #root, main, .flex { 
-                display: block !important; 
-                height: auto !important; 
-                overflow: visible !important; 
+
+            /* Esconde TUDO por padrão */
+            body * {
+                visibility: hidden;
+            }
+
+            /* Mostra apenas a folha do relatório e seus filhos */
+            .report-page,
+            .report-page * {
+                visibility: visible;
+            }
+
+            /* Posiciona a folha no topo absoluto para ocupar o PDF inteiro */
+            .report-page {
+                position: absolute;
+                left: 0;
+                top: 0;
                 width: 100% !important;
+                margin: 0 !important;
+                padding: 3cm 2cm 2cm 3cm !important;
+                /* Mantém margem ABNT */
+                box-shadow: none !important;
+                border: none !important;
+                page-break-after: always;
+            }
+
+            /* Garante que nada interfira no fluxo */
+            .no-print,
+            nav,
+            header,
+            .sidebar,
+            #root>div>div {
+                display: none !important;
             }
         }
 
-        body { font-family: 'Roboto', 'Segoe UI', sans-serif; background-color: #f1f5f9; }
-        
+        body {
+            font-family: 'Roboto', 'Segoe UI', sans-serif;
+            background-color: #f1f5f9;
+        }
+
         /* Animações */
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .slide-in-right { animation: slideInRight 0.3s ease-out; }
-        @keyframes slideInRight { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        .fade-in {
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-in-right {
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
 
         /* Scrollbars */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
         /* Folha A4 na tela (Preview) */
         .a4-paper {
             width: 210mm;
             min-height: 297mm;
-            padding: 3cm 2cm 2cm 3cm; /* Margens ABNT */
+            padding: 3cm 2cm 2cm 3cm;
+            /* Margens ABNT */
             margin: 0 auto;
             background: white;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -95,13 +144,15 @@
             text-align: justify;
             color: #000;
         }
+
         .abnt-text p {
             text-indent: 1.25cm;
             margin-bottom: 0;
             margin-top: 0;
         }
-        .abnt-text p + p {
-            margin-top: 6pt; 
+
+        .abnt-text p+p {
+            margin-top: 6pt;
         }
 
         .abnt-title {
@@ -112,7 +163,7 @@
             text-align: center;
             margin-bottom: 1.5cm;
         }
-        
+
         .abnt-header {
             font-family: 'Arial', sans-serif;
             font-size: 12pt;
@@ -127,11 +178,13 @@
             color: #9ca3af;
             cursor: text;
         }
+
         [contenteditable]:focus {
             outline: none;
         }
     </style>
 </head>
+
 <body class="bg-slate-100 text-slate-900">
 
     <div id="root"></div>
@@ -141,29 +194,29 @@
 
         // --- ÍCONES ---
         const Icons = {
-            Brain: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>,
-            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-            ClipboardList: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>,
-            Activity: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
-            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>,
-            LayoutDashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
-            Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-            Trash2: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
-            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
-            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-            Lightbulb: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
-            Database: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
-            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-            Sheet: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h4"/></svg>,
-            Layers: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
-            Code: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
-            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
-            Info: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
-            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
-            Circle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/></svg>,
-            Flag: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>,
+            Brain: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" /><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" /></svg>,
+            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+            ClipboardList: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></svg>,
+            Activity: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
+            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" /><line x1="10" x2="8" y1="9" y2="9" /></svg>,
+            LayoutDashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>,
+            Save: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>,
+            Trash2: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>,
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>,
+            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>,
+            Lightbulb: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" /><path d="M9 18h6" /><path d="M10 22h4" /></svg>,
+            Database: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" /><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" /></svg>,
+            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></svg>,
+            Sheet: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M8 13h8" /><path d="M8 17h8" /><path d="M10 9h4" /></svg>,
+            Layers: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>,
+            Code: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>,
+            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
+            Info: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>,
+            CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
+            Circle: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /></svg>,
+            Flag: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" x2="4" y1="22" y2="15" /></svg>,
             ArrowRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>,
-            PieChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+            PieChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>
         };
 
         // --- CONFIGURAÇÃO DO DIAGNÓSTICO ---
@@ -183,14 +236,14 @@
 
         // --- BANCO DE ESTRATÉGIAS (RESTAURADO COMPLETO V11) ---
         const strategiesDB = {
-            'Atencao': [ 'Jogo da Memória temático.', 'Quebra-cabeça progressivo.', 'Atividade "Encontre o Erro".', 'Sequenciamento lógico.', 'Uso de timer visual.', 'Caça ao tesouro sensorial.', 'Jogos de Lince ou "Wally".', 'Classificação por cor/forma.', 'Pareamento de sombras.', 'Labirintos.', 'Jogo da estátua.', 'Repetição de sequências sonoras.', 'Memória de trabalho auditiva.', 'Atividades de alinhavo.' ],
-            'Leitura': [ 'Associação imagem-palavra.', 'Leitura compartilhada.', 'Caça-palavras.', 'Alfabeto Móvel.', 'Bingo de sílabas.', 'Leitura fatiada.', 'Sussurrofone.', 'Dominó de palavras.', 'Banco de palavras.', 'Leitura de rótulos.', 'Jogos de rima.', 'Pareamento figura-letra inicial.', 'Construção de frases.', 'Aplicativos de alfabetização.' ],
-            'Matematica': [ 'Contagem concreta.', 'Jogos de trilha.', 'Material Dourado.', 'Mercadinho simbólico.', 'Classificação por atributos.', 'Quebra-cabeça numérico.', 'Régua numérica.', 'Bingo de números.', 'Receita culinária.', 'Jogos de cartas.', 'Tangram.', 'Sequência com calendário.', 'Situações-problema ilustradas.', 'Uso de calculadora.' ],
-            'Motor': [ 'Alinhavo.', 'Massinha de modelar.', 'Transposição de grãos/água.', 'Rasgadura e colagem.', 'Circuito motor simples.', 'Recorte de linhas.', 'Pintura a dedo.', 'Encaixe de pinos.', 'Abotoar/desabotoar.', 'Caixa de areia.', 'Amassar papel.', 'Tesoura com mola.', 'Pega Varetas.', 'Colar adesivos.' ],
-            'Social': [ 'Jogos cooperativos.', 'Histórias sociais.', 'Reconhecimento de emoções.', 'Dramatização (teatrinho).', 'Brincadeira dirigida.', 'Construção de regras.', 'Mímica.', 'Identificação de expressões.', 'Faz de Conta.', 'Compartilhamento.', 'Treino de contato visual.', 'Comunicação alternativa.', 'Rodinha de conversa.', 'Jogos de regras.' ],
-            'AVD': [ 'Amarrar sapatos.', 'Painel de atividades (ziper).', 'Organização da mochila.', 'Higiene das mãos.', 'Servir lanche.', 'Vestuário e clima.', 'Uso do banheiro.', 'Escovação de dentes.', 'Limpar a mesa.', 'Uso de dinheiro.', 'Abrir potes.', 'Uso de talheres.', 'Itens de higiene.', 'Agenda visual.' ]
+            'Atencao': ['Jogo da Memória temático.', 'Quebra-cabeça progressivo.', 'Atividade "Encontre o Erro".', 'Sequenciamento lógico.', 'Uso de timer visual.', 'Caça ao tesouro sensorial.', 'Jogos de Lince ou "Wally".', 'Classificação por cor/forma.', 'Pareamento de sombras.', 'Labirintos.', 'Jogo da estátua.', 'Repetição de sequências sonoras.', 'Memória de trabalho auditiva.', 'Atividades de alinhavo.'],
+            'Leitura': ['Associação imagem-palavra.', 'Leitura compartilhada.', 'Caça-palavras.', 'Alfabeto Móvel.', 'Bingo de sílabas.', 'Leitura fatiada.', 'Sussurrofone.', 'Dominó de palavras.', 'Banco de palavras.', 'Leitura de rótulos.', 'Jogos de rima.', 'Pareamento figura-letra inicial.', 'Construção de frases.', 'Aplicativos de alfabetização.'],
+            'Matematica': ['Contagem concreta.', 'Jogos de trilha.', 'Material Dourado.', 'Mercadinho simbólico.', 'Classificação por atributos.', 'Quebra-cabeça numérico.', 'Régua numérica.', 'Bingo de números.', 'Receita culinária.', 'Jogos de cartas.', 'Tangram.', 'Sequência com calendário.', 'Situações-problema ilustradas.', 'Uso de calculadora.'],
+            'Motor': ['Alinhavo.', 'Massinha de modelar.', 'Transposição de grãos/água.', 'Rasgadura e colagem.', 'Circuito motor simples.', 'Recorte de linhas.', 'Pintura a dedo.', 'Encaixe de pinos.', 'Abotoar/desabotoar.', 'Caixa de areia.', 'Amassar papel.', 'Tesoura com mola.', 'Pega Varetas.', 'Colar adesivos.'],
+            'Social': ['Jogos cooperativos.', 'Histórias sociais.', 'Reconhecimento de emoções.', 'Dramatização (teatrinho).', 'Brincadeira dirigida.', 'Construção de regras.', 'Mímica.', 'Identificação de expressões.', 'Faz de Conta.', 'Compartilhamento.', 'Treino de contato visual.', 'Comunicação alternativa.', 'Rodinha de conversa.', 'Jogos de regras.'],
+            'AVD': ['Amarrar sapatos.', 'Painel de atividades (ziper).', 'Organização da mochila.', 'Higiene das mãos.', 'Servir lanche.', 'Vestuário e clima.', 'Uso do banheiro.', 'Escovação de dentes.', 'Limpar a mesa.', 'Uso de dinheiro.', 'Abrir potes.', 'Uso de talheres.', 'Itens de higiene.', 'Agenda visual.']
         };
-        
+
         // Mapeamento para sugestão do Gráfico (De Área Genérica para Específica do Banco)
         const areaToStrategyMap = {
             'Cognitivo': 'Atencao',
@@ -202,10 +255,19 @@
         // --- UTILITÁRIOS ---
         const generateId = () => Math.random().toString(36).substr(2, 9);
         const formatDate = (dateString) => { if (!dateString) return '-'; const [y, m, d] = dateString.split('T')[0].split('-'); return `${d}/${m}/${y}`; };
-        const getTodayDate = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; };
+        const getTodayDate = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
         const getLabel = (val) => LEVEL_CONFIG[val]?.label || val || '-';
-        const calculateAge = (b) => { if(!b) return '-'; const t = new Date(); const d = new Date(b); let a = t.getFullYear() - d.getFullYear(); const m = t.getMonth() - d.getMonth(); if (m < 0 || (m === 0 && t.getDate() < d.getDate())) a--; return a + ' anos'; };
-
+        // A alteração evita bugs de fuso horário separando a string manualmente
+        const calculateAge = (b) => {
+            if (!b) return '-';
+            const [y, m, d] = b.split('-');
+            const birth = new Date(y, m - 1, d);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const mDiff = today.getMonth() - birth.getMonth();
+            if (mDiff < 0 || (mDiff === 0 && today.getDate() < birth.getDate())) age--;
+            return age + ' anos';
+        };
         // --- COMPONENTES UI ---
         const Toast = ({ message, type, onClose }) => {
             useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
@@ -228,9 +290,9 @@
         const DiagnosisItem = ({ label, value, onChange }) => (
             <div className="mb-4">
                 <label className="block text-sm font-bold text-slate-700 mb-1">{label}</label>
-                <select 
-                    className={`w-full p-2 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-indigo-500 ${LEVEL_CONFIG[value]?.color || ''}`} 
-                    value={value} 
+                <select
+                    className={`w-full p-2 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-indigo-500 ${LEVEL_CONFIG[value]?.color || ''}`}
+                    value={value}
                     onChange={(e) => onChange(e.target.value)}
                 >
                     {Object.entries(LEVEL_CONFIG).map(([key, config]) => (
@@ -254,8 +316,8 @@
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-8 slide-in-right relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Icons.Flag /></div>
                     <h3 className="text-lg font-bold text-slate-700 mb-1 flex items-center gap-2">
-                         <span className="bg-indigo-100 text-indigo-700 p-1 rounded"><Icons.Activity /></span> 
-                         Fluxo Pedagógico: {student.name}
+                        <span className="bg-indigo-100 text-indigo-700 p-1 rounded"><Icons.Activity /></span>
+                        Fluxo Pedagógico: {student.name}
                     </h3>
                     <p className="text-sm text-slate-500 mb-6">Acompanhe a etapa atual do estudante.</p>
                     <div className="relative flex flex-col md:flex-row justify-between items-center w-full z-10 gap-4 md:gap-0">
@@ -300,13 +362,13 @@
             const processData = () => {
                 const diag = diagnoses.find(d => d.studentId === studentId);
                 const check = checklists.filter(c => c.studentId === studentId).pop(); // Pega a última evolução
-                
+
                 const labels = ["Cognitivo", "Acadêmico", "Motor", "Social"];
-                
+
                 // Calcula médias
                 const dataInitial = DIAGNOSIS_AREAS.map(area => calculateAreaAvg(diag, area.items));
                 const dataCurrent = DIAGNOSIS_AREAS.map(area => calculateAreaAvg(check, area.items));
-                
+
                 // Análise Automática
                 let text = [];
                 let weakestArea = { name: '', val: 4, index: -1 };
@@ -337,16 +399,16 @@
                 if (weakestArea.name) {
                     // Mapeia da área fraca do gráfico para uma chave do banco detalhado
                     const strategyKey = areaToStrategyMap[weakestArea.name] || 'Atencao';
-                    
+
                     // Se for Acadêmico, sorteia entre Leitura e Matemática para variar
                     let finalKey = strategyKey;
                     if (weakestArea.name === 'Acadêmico') {
-                         finalKey = Math.random() > 0.5 ? 'Leitura' : 'Matematica';
+                        finalKey = Math.random() > 0.5 ? 'Leitura' : 'Matematica';
                     }
 
                     const strategies = strategiesDB[finalKey] || [];
                     const randomStrat = strategies.sort(() => 0.5 - Math.random()).slice(0, 3);
-                    
+
                     setSuggestion({
                         area: weakestArea.name,
                         strategies: randomStrat,
@@ -361,7 +423,7 @@
 
             useEffect(() => {
                 if (!studentId || !chartCanvasRef.current) return;
-                
+
                 const { labels, dataInitial, dataCurrent } = processData();
 
                 if (chartInstanceRef.current) chartInstanceRef.current.destroy();
@@ -417,7 +479,7 @@
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 fade-in">
                     {/* COLUNA 1: GRÁFICO */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                        <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><Icons.Activity/> Mapa de Desenvolvimento</h3>
+                        <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><Icons.Activity /> Mapa de Desenvolvimento</h3>
                         <div className="relative h-80 w-full flex justify-center">
                             <canvas ref={chartCanvasRef} />
                         </div>
@@ -428,28 +490,28 @@
                     <div className="space-y-6">
                         {/* ANÁLISE AUTOMÁTICA */}
                         <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-xl">
-                            <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Icons.Brain/> Análise Descritiva</h3>
-                            <p className="text-sm text-indigo-900 leading-relaxed" dangerouslySetInnerHTML={{__html: analysis}}></p>
+                            <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Icons.Brain /> Análise Descritiva</h3>
+                            <p className="text-sm text-indigo-900 leading-relaxed" dangerouslySetInnerHTML={{ __html: analysis }}></p>
                         </div>
 
                         {/* GERADOR DE ATIVIDADES */}
                         {suggestion && (
                             <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-4 opacity-5"><Icons.Lightbulb/></div>
+                                <div className="absolute top-0 right-0 p-4 opacity-5"><Icons.Lightbulb /></div>
                                 <h3 className="font-bold text-slate-700 mb-2">Sugestão de Atividade</h3>
                                 <p className="text-xs text-slate-500 mb-4">Baseado na área de maior necessidade: <strong className="uppercase">{suggestion.area}</strong></p>
-                                
+
                                 <ul className="space-y-2 mb-6">
                                     {suggestion.strategies.map((s, i) => (
                                         <li key={i} className="text-sm text-slate-600 flex gap-2"><div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-teal-500"></div>{s}</li>
                                     ))}
                                 </ul>
 
-                                <button 
+                                <button
                                     onClick={() => onGenerateLog(suggestion)}
                                     className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
                                 >
-                                    <Icons.ClipboardList/> Criar Registro no Diário
+                                    <Icons.ClipboardList /> Criar Registro no Diário
                                 </button>
                             </div>
                         )}
@@ -461,7 +523,7 @@
         // --- COMPONENTE RELATÓRIO ---
         const ReportPaper = ({ student, diagnosis, checklist, logs, settings, isBatch = false }) => {
             const generateText = () => {
-                if(!student) return '';
+                if (!student) return '';
                 let d = diagnosis || {};
                 let c = checklist || {};
                 let html = `<p>O(A) estudante <strong>${student.name}</strong>, matriculado(a) na série <strong>${student.grade}</strong>, com indicativo de <strong>${student.needs || 'necessidade específica'}</strong>, frequenta o Atendimento Educacional Especializado (AEE) desde ${formatDate(student.entryDate)}.</p>`;
@@ -476,11 +538,11 @@
                             if (valInit !== valCurr) return `em <strong>${item.label.toLowerCase()}</strong>, inicialmente encontrava-se <em>${lblInit}</em>, e atualmente observa-se que está <em>${lblCurr}</em>, evidenciando evolução`;
                             else return `em <strong>${item.label.toLowerCase()}</strong>, mantém-se <em>${lblInit}</em>, necessitando de continuidade nas estratégias`;
                         } else if (valCurr && valCurr !== 'nao_observado') {
-                             return `em relação à <strong>${item.label.toLowerCase()}</strong>, observa-se que encontra-se <em>${LEVEL_CONFIG[valCurr].label.split(' (')[0].toLowerCase()}</em>`;
+                            return `em relação à <strong>${item.label.toLowerCase()}</strong>, observa-se que encontra-se <em>${LEVEL_CONFIG[valCurr].label.split(' (')[0].toLowerCase()}</em>`;
                         }
                         return null;
                     }).filter(Boolean);
-                    if(items.length > 0) html += `<p>No que tange aos <strong>${area.title.replace(/^\d+\.\s/, '').toLowerCase()}</strong>, ${items.join('; ')}.</p>`;
+                    if (items.length > 0) html += `<p>No que tange aos <strong>${area.title.replace(/^\d+\.\s/, '').toLowerCase()}</strong>, ${items.join('; ')}.</p>`;
                 });
                 html += `<p>Durante o período, foram realizados <strong>${logs.length} atendimentos</strong>. O trabalho pedagógico focou em estratégias lúdicas e estruturadas, visando o desenvolvimento integral do(a) aluno(a).</p>`;
                 html += `<p>Sugere-se a continuidade do atendimento no contraturno, bem como a parceria constante com a família e a escola regular para generalização das habilidades trabalhadas.</p>`;
@@ -500,15 +562,24 @@
                     </div>
                     <div className="abnt-title">RELATÓRIO DE DESENVOLVIMENTO INDIVIDUAL</div>
                     <div className="mb-6 text-sm font-arial leading-relaxed border p-4 rounded border-gray-300">
-                        <strong>Estudante:</strong> {student.name}<br/>
-                        <strong>Data Nasc:</strong> {student.birthDate ? formatDate(student.birthDate) : '-'} ({calculateAge(student.birthDate)})<br/>
-                        <strong>Série/Turma:</strong> {student.grade} &nbsp;&nbsp; | &nbsp;&nbsp; <strong>Necessidade:</strong> {student.needs}<br/>
+                        <strong>Estudante:</strong> {student.name}<br />
+                        <strong>Data Nasc:</strong> {student.birthDate ? formatDate(student.birthDate) : '-'} ({calculateAge(student.birthDate)})<br />
+                        <strong>Série/Turma:</strong> {student.grade} &nbsp;&nbsp; | &nbsp;&nbsp; <strong>Necessidade:</strong> {student.needs}<br />
                         <strong>Período Avaliado:</strong> {checklist?.period || 'Semestre Atual'}
                     </div>
                     <div className="abnt-text outline-none min-h-[400px]" contentEditable={true} suppressContentEditableWarning={true} dangerouslySetInnerHTML={{ __html: htmlContent }}></div>
-                    <div className="mt-auto pt-16 flex justify-between items-end break-inside-avoid">
-                        <div className="text-center w-5/12"><div className="border-t border-black mb-2"></div><p className="font-bold text-sm uppercase">{settings.teacherName || 'Professor(a)'}</p><p className="text-xs">Professor(a) do AEE</p></div>
-                        <div className="text-center w-5/12"><div className="border-t border-black mb-2"></div><p className="font-bold text-sm uppercase">{settings.coordinatorName || 'Coordenador(a)'}</p><p className="text-xs">Coordenação Pedagógica / AEE</p></div>
+
+                    <div className="mt-auto pt-12 flex justify-between items-end break-inside-avoid px-8">
+                        <div className="text-center w-5/12">
+                            <div className="border-t border-black mb-2"></div>
+                            <p className="font-bold text-sm uppercase">{settings.teacherName || 'Professor(a) AEE'}</p>
+                            <p className="text-[10px] text-gray-600">Docente do Atendimento Educacional Especializado</p>
+                        </div>
+                        <div className="text-center w-5/12">
+                            <div className="border-t border-black mb-2"></div>
+                            <p className="font-bold text-sm uppercase">{settings.coordinatorName || 'Coordenação / Direção'}</p>
+                            <p className="text-[10px] text-gray-600">Equipe Gestora</p>
+                        </div>
                     </div>
                     <div className="text-center text-[10px] mt-8 text-gray-500">Documento gerado em {formatDate(getTodayDate())}</div>
                 </div>
@@ -519,14 +590,14 @@
         function App() {
             const [activeTab, setActiveTab] = useState('dashboard');
             const [toast, setToast] = useState(null);
-            
+
             // Dados
             const [students, setStudents] = useState([]);
             const [diagnoses, setDiagnoses] = useState([]);
             const [logs, setLogs] = useState([]);
             const [checklists, setChecklists] = useState([]);
             const [settings, setSettings] = useState({ schoolName: '', teacherName: '', coordinatorName: '' });
-            
+
             // Forms e Estados
             const [newStudent, setNewStudent] = useState({});
             const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -534,7 +605,7 @@
             const [newChecklist, setNewChecklist] = useState({ period: '', evaluator: '' });
             const [batchMode, setBatchMode] = useState(false);
             const [batchFilter, setBatchFilter] = useState('');
-            
+
             // Estado para Log Pré-preenchido (Vindo do Gráfico)
             const [prefillLogData, setPrefillLogData] = useState(null);
 
@@ -578,21 +649,21 @@
             };
 
             const handleDeleteStudent = (id) => {
-                if(confirm("Tem certeza que deseja apagar este aluno e todos os dados dele?")) {
+                if (confirm("Tem certeza que deseja apagar este aluno e todos os dados dele?")) {
                     setStudents(students.filter(s => s.id !== id)); setDiagnoses(diagnoses.filter(d => d.studentId !== id)); setLogs(logs.filter(l => l.studentId !== id)); setChecklists(checklists.filter(c => c.studentId !== id));
-                    if(selectedStudentId === id) setSelectedStudentId(''); showToast('Aluno removido.');
+                    if (selectedStudentId === id) setSelectedStudentId(''); showToast('Aluno removido.');
                 }
             };
-            
+
             const handleSaveDiagnosis = (field, value) => {
-                if(!selectedStudentId) return;
+                if (!selectedStudentId) return;
                 const existing = diagnoses.find(d => d.studentId === selectedStudentId) || { studentId: selectedStudentId };
                 const updated = { ...existing, date: getTodayDate(), [field]: value };
                 setDiagnoses([...diagnoses.filter(d => d.studentId !== selectedStudentId), updated]);
             };
 
             const handleAddLog = () => {
-                if(!selectedStudentId || !newLog.objective) return showToast('Preencha Objetivo e Estratégia', 'error');
+                if (!selectedStudentId || !newLog.objective) return showToast('Preencha Objetivo e Estratégia', 'error');
                 setLogs([...logs, { id: generateId(), studentId: selectedStudentId, date: newLog.date || getTodayDate(), ...newLog }]);
                 setNewLog({}); showToast('Atendimento registrado!');
             };
@@ -604,10 +675,10 @@
             };
 
             const handleAddChecklist = () => {
-                if(!selectedStudentId || !newChecklist.period) return showToast('Informe o Período', 'error');
+                if (!selectedStudentId || !newChecklist.period) return showToast('Informe o Período', 'error');
                 const currentDiag = diagnoses.find(d => d.studentId === selectedStudentId) || {};
                 const checklistData = { id: generateId(), studentId: selectedStudentId, date: getTodayDate(), ...newChecklist, ...currentDiag };
-                delete checklistData._id; 
+                delete checklistData._id;
                 setChecklists([...checklists, checklistData]);
                 setNewChecklist({ period: '', evaluator: '' }); showToast('Avaliação salva!');
             };
@@ -647,7 +718,7 @@
 
             const StudentSelect = ({ label = "SELECIONE O ALUNO:" }) => (
                 <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm no-print">
-                    <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2 text-indigo-600"><Icons.Users/> {label}</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2 text-indigo-600"><Icons.Users /> {label}</label>
                     <select className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 font-medium" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}>
                         <option value="">-- Clique aqui para selecionar --</option>
                         {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.grade})</option>)}
@@ -695,10 +766,10 @@
                 reader.onload = (ev) => {
                     try {
                         const data = JSON.parse(ev.target.result);
-                        if(confirm("Isso substituirá os dados atuais. Continuar?")) {
+                        if (confirm("Isso substituirá os dados atuais. Continuar?")) {
                             setStudents(data.students || []); setDiagnoses(data.diagnoses || []); setLogs(data.logs || []); setChecklists(data.checklists || []); setSettings(data.settings || {}); showToast('Dados restaurados!');
                         }
-                    } catch(err) { showToast('Arquivo inválido.', 'error'); }
+                    } catch (err) { showToast('Arquivo inválido.', 'error'); }
                 };
                 reader.readAsText(file);
             };
@@ -709,20 +780,20 @@
 
                     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col no-print shadow-xl z-20">
                         <div className="p-6 flex items-center gap-3 text-white border-b border-slate-800">
-                            <Icons.Brain /> 
+                            <Icons.Brain />
                             <div><span className="font-bold text-lg block leading-none tracking-tight">Gestão AEE</span><span className="text-[10px] uppercase font-bold text-indigo-400">Versão 13.0 (Completa)</span></div>
                         </div>
                         <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
                             {[
-                                {id: 'dashboard', label: 'Visão Geral', icon: Icons.LayoutDashboard},
-                                {id: 'students', label: 'Alunos', icon: Icons.Users},
-                                {id: 'diagnosis', label: 'Avaliação Inicial', icon: Icons.Search},
-                                {id: 'logs', label: 'Diário', icon: Icons.ClipboardList},
-                                {id: 'checklists', label: 'Evolução', icon: Icons.Activity},
-                                {id: 'charts', label: 'Gráficos e Análise', icon: Icons.PieChart},
-                                {id: 'reports', label: 'Relatórios', icon: Icons.FileText},
-                                {id: 'settings', label: 'Backup / Dados', icon: Icons.Database},
-                                {id: 'about', label: 'Sobre o Dev', icon: Icons.Code},
+                                { id: 'dashboard', label: 'Visão Geral', icon: Icons.LayoutDashboard },
+                                { id: 'students', label: 'Alunos', icon: Icons.Users },
+                                { id: 'diagnosis', label: 'Avaliação Inicial', icon: Icons.Search },
+                                { id: 'logs', label: 'Diário', icon: Icons.ClipboardList },
+                                { id: 'checklists', label: 'Evolução', icon: Icons.Activity },
+                                { id: 'charts', label: 'Gráficos e Análise', icon: Icons.PieChart },
+                                { id: 'reports', label: 'Relatórios', icon: Icons.FileText },
+                                { id: 'settings', label: 'Backup / Dados', icon: Icons.Database },
+                                { id: 'about', label: 'Sobre o Dev', icon: Icons.Code },
                             ].map(item => (
                                 <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all duration-200 font-medium ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg translate-x-1' : 'hover:bg-slate-800 hover:text-white'}`}>
                                     <item.icon /> {item.label}
@@ -734,19 +805,19 @@
 
                     <main className="flex-1 overflow-auto bg-slate-100 relative">
                         <div className="max-w-5xl mx-auto p-8 fade-in min-h-full pb-20">
-                            
+
                             {activeTab === 'dashboard' && (
                                 <div className="space-y-8">
                                     <header><h2 className="text-3xl font-bold text-slate-800">Painel de Controle</h2><p className="text-slate-500 mt-1">Gerencie o fluxo pedagógico.</p></header>
                                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 shadow-sm">
                                         <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.ArrowRight /> Acompanhamento do Fluxo Oficial</h3>
                                         <div className="bg-white p-4 rounded-xl border border-slate-200 mb-4"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">Selecione um aluno:</label><select className="w-full p-2 border border-slate-300 rounded-lg bg-slate-50" value={selectedStudentId} onChange={e => setSelectedStudentId(e.target.value)}><option value="">-- Selecione --</option>{students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.grade})</option>)}</select></div>
-                                        {selectedStudentId ? <FlowTracker student={students.find(s => s.id === selectedStudentId)} currentStage={getStudentStage(selectedStudentId)} onStepClick={handleFlowClick}/> : <div className="text-center py-6 text-slate-400 text-sm italic bg-white rounded-xl border border-dashed border-slate-200">Selecione um aluno acima para ver a linha do tempo.</div>}
+                                        {selectedStudentId ? <FlowTracker student={students.find(s => s.id === selectedStudentId)} currentStage={getStudentStage(selectedStudentId)} onStepClick={handleFlowClick} /> : <div className="text-center py-6 text-slate-400 text-sm italic bg-white rounded-xl border border-dashed border-slate-200">Selecione um aluno acima para ver a linha do tempo.</div>}
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('students')}><div className="p-4 bg-indigo-100 text-indigo-600 rounded-xl"><Icons.Users/></div><div><div className="text-3xl font-bold text-slate-800">{students.length}</div><div className="text-sm font-medium text-slate-500">Alunos</div></div></div>
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('logs')}><div className="p-4 bg-teal-100 text-teal-600 rounded-xl"><Icons.ClipboardList/></div><div><div className="text-3xl font-bold text-slate-800">{logs.length}</div><div className="text-sm font-medium text-slate-500">Atendimentos</div></div></div>
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('charts')}><div className="p-4 bg-purple-100 text-purple-600 rounded-xl"><Icons.PieChart/></div><div><div className="text-3xl font-bold text-slate-800">Análise</div><div className="text-sm font-medium text-slate-500">Ver Gráficos</div></div></div>
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('students')}><div className="p-4 bg-indigo-100 text-indigo-600 rounded-xl"><Icons.Users /></div><div><div className="text-3xl font-bold text-slate-800">{students.length}</div><div className="text-sm font-medium text-slate-500">Alunos</div></div></div>
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('logs')}><div className="p-4 bg-teal-100 text-teal-600 rounded-xl"><Icons.ClipboardList /></div><div><div className="text-3xl font-bold text-slate-800">{logs.length}</div><div className="text-sm font-medium text-slate-500">Atendimentos</div></div></div>
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('charts')}><div className="p-4 bg-purple-100 text-purple-600 rounded-xl"><Icons.PieChart /></div><div><div className="text-3xl font-bold text-slate-800">Análise</div><div className="text-sm font-medium text-slate-500">Ver Gráficos</div></div></div>
                                     </div>
                                 </div>
                             )}
@@ -756,18 +827,18 @@
                                     <header><h2 className="text-2xl font-bold text-slate-800">Alunos</h2></header>
                                     <Card title="Novo Cadastro">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: Maria Souza" value={newStudent.name || ''} onChange={e => setNewStudent({...newStudent, name: e.target.value})} /></div>
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Data de Nascimento</label><input type="date" className="w-full border p-3 rounded-lg bg-slate-50" value={newStudent.birthDate || ''} onChange={e => setNewStudent({...newStudent, birthDate: e.target.value})} /></div>
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Série</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: 3º Ano B" value={newStudent.grade || ''} onChange={e => setNewStudent({...newStudent, grade: e.target.value})} /></div>
-                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Necessidade Educacional Específica</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: TEA, TDAH..." value={newStudent.needs || ''} onChange={e => setNewStudent({...newStudent, needs: e.target.value})} /></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: Maria Souza" value={newStudent.name || ''} onChange={e => setNewStudent({ ...newStudent, name: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Data de Nascimento</label><input type="date" className="w-full border p-3 rounded-lg bg-slate-50" value={newStudent.birthDate || ''} onChange={e => setNewStudent({ ...newStudent, birthDate: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Série</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: 3º Ano B" value={newStudent.grade || ''} onChange={e => setNewStudent({ ...newStudent, grade: e.target.value })} /></div>
+                                            <div><label className="text-xs font-bold text-slate-500 uppercase">Necessidade Educacional Específica</label><input className="w-full border p-3 rounded-lg bg-slate-50" placeholder="Ex: TEA, TDAH..." value={newStudent.needs || ''} onChange={e => setNewStudent({ ...newStudent, needs: e.target.value })} /></div>
                                         </div>
-                                        <button onClick={handleAddStudent} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors w-full md:w-auto justify-center"><Icons.Save/> Cadastrar Aluno</button>
+                                        <button onClick={handleAddStudent} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors w-full md:w-auto justify-center"><Icons.Save /> Cadastrar Aluno</button>
                                     </Card>
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                                         <table className="w-full text-left">
                                             <thead className="bg-slate-50 border-b text-slate-500 text-sm uppercase"><tr><th className="p-4">Nome</th><th className="p-4">Idade</th><th className="p-4">Série</th><th className="p-4">Necessidade</th><th className="p-4 text-right">Ação</th></tr></thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {students.map(s => <tr key={s.id} className="hover:bg-slate-50"><td className="p-4 font-medium">{s.name}</td><td className="p-4">{calculateAge(s.birthDate)}</td><td className="p-4">{s.grade}</td><td className="p-4"><span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{s.needs}</span></td><td className="p-4 text-right"><button onClick={() => handleDeleteStudent(s.id)} className="text-red-400 p-2"><Icons.Trash2/></button></td></tr>)}
+                                                {students.map(s => <tr key={s.id} className="hover:bg-slate-50"><td className="p-4 font-medium">{s.name}</td><td className="p-4">{calculateAge(s.birthDate)}</td><td className="p-4">{s.grade}</td><td className="p-4"><span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{s.needs}</span></td><td className="p-4 text-right"><button onClick={() => handleDeleteStudent(s.id)} className="text-red-400 p-2"><Icons.Trash2 /></button></td></tr>)}
                                             </tbody>
                                         </table>
                                     </div>
@@ -796,9 +867,9 @@
                                         <div className="lg:col-span-1 space-y-6">
                                             <Card title="Novo Registro">
                                                 <div className="space-y-4">
-                                                    <div><label className="text-xs font-bold text-slate-500 uppercase">Data</label><input type="date" className="w-full border p-2 rounded bg-slate-50" value={newLog.date || ''} onChange={e => setNewLog({...newLog, date: e.target.value})} /></div>
-                                                    <div><label className="text-xs font-bold text-slate-500 uppercase">Eixo</label><select className="w-full border p-2 rounded bg-slate-50" value={newLog.objective || ''} onChange={e => setNewLog({...newLog, objective: e.target.value})}><option value="">Selecione...</option><option value="Atencao">Atenção e F. Executivas</option><option value="Leitura">Leitura e Escrita</option><option value="Matematica">Matemática</option><option value="Motor">Coordenação Motora</option><option value="Social">Social</option><option value="AVD">Autonomia (AVD)</option></select></div>
-                                                    <div><div className="flex justify-between mb-1"><label className="text-xs font-bold text-slate-500 uppercase">Estratégia</label><button onClick={handleSuggestStrategy} className="text-xs text-indigo-600 font-bold hover:underline flex gap-1"><Icons.Lightbulb/> Sugerir</button></div><textarea className="w-full border p-2 rounded h-24 text-sm bg-slate-50" value={newLog.strategy || ''} onChange={e => setNewLog({...newLog, strategy: e.target.value})} placeholder="Descrição..."></textarea></div>
+                                                    <div><label className="text-xs font-bold text-slate-500 uppercase">Data</label><input type="date" className="w-full border p-2 rounded bg-slate-50" value={newLog.date || ''} onChange={e => setNewLog({ ...newLog, date: e.target.value })} /></div>
+                                                    <div><label className="text-xs font-bold text-slate-500 uppercase">Eixo</label><select className="w-full border p-2 rounded bg-slate-50" value={newLog.objective || ''} onChange={e => setNewLog({ ...newLog, objective: e.target.value })}><option value="">Selecione...</option><option value="Atencao">Atenção e F. Executivas</option><option value="Leitura">Leitura e Escrita</option><option value="Matematica">Matemática</option><option value="Motor">Coordenação Motora</option><option value="Social">Social</option><option value="AVD">Autonomia (AVD)</option></select></div>
+                                                    <div><div className="flex justify-between mb-1"><label className="text-xs font-bold text-slate-500 uppercase">Estratégia</label><button onClick={handleSuggestStrategy} className="text-xs text-indigo-600 font-bold hover:underline flex gap-1"><Icons.Lightbulb /> Sugerir</button></div><textarea className="w-full border p-2 rounded h-24 text-sm bg-slate-50" value={newLog.strategy || ''} onChange={e => setNewLog({ ...newLog, strategy: e.target.value })} placeholder="Descrição..."></textarea></div>
                                                     <button onClick={handleAddLog} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-lg font-bold transition-colors">Registrar</button>
                                                 </div>
                                             </Card>
@@ -828,8 +899,8 @@
                                     {selectedStudentId ? <div className="fade-in space-y-6">
                                         <Card title="Nova Avaliação">
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                                <div><label className="text-xs font-bold text-slate-500 uppercase">Período</label><input className="w-full border p-2 rounded bg-slate-50" placeholder="Ex: 2º Semestre" value={newChecklist.period || ''} onChange={e => setNewChecklist({...newChecklist, period: e.target.value})} /></div>
-                                                <div><label className="text-xs font-bold text-slate-500 uppercase">Avaliador</label><input className="w-full border p-2 rounded bg-slate-50" placeholder="Nome" value={newChecklist.evaluator || ''} onChange={e => setNewChecklist({...newChecklist, evaluator: e.target.value})} /></div>
+                                                <div><label className="text-xs font-bold text-slate-500 uppercase">Período</label><input className="w-full border p-2 rounded bg-slate-50" placeholder="Ex: 2º Semestre" value={newChecklist.period || ''} onChange={e => setNewChecklist({ ...newChecklist, period: e.target.value })} /></div>
+                                                <div><label className="text-xs font-bold text-slate-500 uppercase">Avaliador</label><input className="w-full border p-2 rounded bg-slate-50" placeholder="Nome" value={newChecklist.evaluator || ''} onChange={e => setNewChecklist({ ...newChecklist, evaluator: e.target.value })} /></div>
                                             </div>
                                             <button onClick={handleAddChecklist} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-xl font-bold shadow-lg transition-colors">Salvar Avaliação Evolutiva</button>
                                         </Card>
@@ -844,25 +915,88 @@
                             )}
 
                             {activeTab === 'reports' && (
-                                <div className="h-full">
+                                <div className="h-full flex flex-col">
                                     <h2 className="text-2xl font-bold text-slate-800 mb-6 no-print">Central de Relatórios</h2>
-                                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-8 no-print fade-in">
+
+                                    {/* Controles Superiores (Configurações) */}
+                                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 no-print fade-in">
                                         <div className="flex flex-wrap items-end gap-6">
-                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">ESCOLA</label><input className="border p-2 rounded w-64" value={settings.schoolName} onChange={e => setSettings({...settings, schoolName: e.target.value})} /></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">PROFESSOR(A)</label><input className="border p-2 rounded w-48" value={settings.teacherName} onChange={e => setSettings({...settings, teacherName: e.target.value})} /></div>
-                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">COORDENAÇÃO</label><input className="border p-2 rounded w-48" value={settings.coordinatorName} onChange={e => setSettings({...settings, coordinatorName: e.target.value})} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">ESCOLA</label><input className="border p-2 rounded w-64" value={settings.schoolName} onChange={e => setSettings({ ...settings, schoolName: e.target.value })} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">PROFESSOR(A)</label><input className="border p-2 rounded w-48" value={settings.teacherName} onChange={e => setSettings({ ...settings, teacherName: e.target.value })} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-500 mb-1">COORDENAÇÃO</label><input className="border p-2 rounded w-48" value={settings.coordinatorName} onChange={e => setSettings({ ...settings, coordinatorName: e.target.value })} /></div>
                                             <div className="h-10 border-r border-slate-200 mx-2"></div>
-                                            <div className="flex items-center gap-4"><button onClick={() => setBatchMode(!batchMode)} className={`px-4 py-2 rounded-lg font-bold transition-colors ${batchMode ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}><Icons.Layers/> {batchMode ? 'Modo Lote Ativo' : 'Ativar Modo Lote'}</button></div>
+                                            <div className="flex items-center gap-4"><button onClick={() => setBatchMode(!batchMode)} className={`px-4 py-2 rounded-lg font-bold transition-colors ${batchMode ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}><Icons.Layers /> {batchMode ? 'Modo Lote Ativo' : 'Ativar Modo Lote'}</button></div>
                                         </div>
-                                        {batchMode && <div className="mt-6 pt-6 border-t border-slate-100 flex items-center gap-4 slide-in"><button onClick={() => handlePrint('Caderno_Relatorios')} className="bg-indigo-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-indigo-700 h-10 mt-5 shadow-lg flex items-center gap-2"><Icons.Download/> IMPRIMIR CADERNO ({getBatchStudents().length} Alunos)</button></div>}
+                                        {batchMode && <div className="mt-6 pt-6 border-t border-slate-100 flex items-center gap-4 slide-in"><button onClick={() => handlePrint('Caderno_Relatorios')} className="bg-indigo-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-indigo-700 h-10 mt-5 shadow-lg flex items-center gap-2"><Icons.Download /> IMPRIMIR CADERNO ({getBatchStudents().length} Alunos)</button></div>}
                                     </div>
+
                                     {!batchMode ? (
-                                        <div className="fade-in">
-                                            <StudentSelect />
-                                            {selectedStudentId ? <div className="flex flex-col lg:flex-row gap-8 items-start"><div className="flex-1 w-full bg-slate-300 p-8 rounded-xl overflow-auto shadow-inner" id="report-preview-container"><ReportPaper student={students.find(s => s.id === selectedStudentId)} diagnosis={diagnoses.find(d => d.studentId === selectedStudentId)} checklist={checklists.filter(c => c.studentId === selectedStudentId).pop()} logs={logs.filter(l => l.studentId === selectedStudentId)} settings={settings} /></div><div className="w-full lg:w-64 no-print flex flex-col gap-4"><div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800"><Icons.Info/> <strong>Dica ABNT:</strong><br/>O texto é editável! Clique sobre ele para ajustar antes de imprimir.</div><button onClick={() => handlePrint(students.find(s => s.id === selectedStudentId)?.name)} className="bg-slate-800 hover:bg-slate-900 text-white w-full py-4 rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-95"><Icons.Download/> SALVAR PDF</button></div></div> : <EmptyState icon={Icons.FileText} message="Selecione um aluno" submessage="Para visualizar o relatório individual." />}
+                                        <div className="fade-in flex flex-col items-center pb-20">
+                                            <div className="w-full max-w-5xl">
+                                                <StudentSelect />
+                                            </div>
+
+                                            {selectedStudentId ? (
+                                                <div className="w-full flex flex-col items-center gap-6">
+
+                                                    {/* 1. DICA ABNT (Agora no Topo) */}
+                                                    <div className="w-full max-w-[210mm] bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800 flex items-center gap-3 no-print">
+                                                        <Icons.Info />
+                                                        <span><strong>Dica ABNT:</strong> O texto abaixo é editável! Clique sobre ele para realizar ajustes finos antes de salvar.</span>
+                                                    </div>
+
+                                                    {/* 2. RELATÓRIO (Agora centralizado e sem cortes) */}
+                                                    {/* O overflow-x-auto permite rolar se a tela for pequena, sem cortar o conteudo */}
+                                                    <div className="w-full overflow-x-auto flex justify-center py-4 bg-slate-300/50 rounded-xl border border-slate-300 shadow-inner">
+                                                        <div id="report-preview-container">
+                                                            <ReportPaper
+                                                                student={students.find(s => s.id === selectedStudentId)}
+                                                                diagnosis={diagnoses.find(d => d.studentId === selectedStudentId)}
+                                                                checklist={checklists.filter(c => c.studentId === selectedStudentId).pop()}
+                                                                logs={logs.filter(l => l.studentId === selectedStudentId)}
+                                                                settings={settings}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* 3. BOTÃO SALVAR (Agora no Final) */}
+                                                    <div className="w-full max-w-[210mm] no-print mt-4">
+                                                        <button
+                                                            onClick={() => handlePrint(students.find(s => s.id === selectedStudentId)?.name)}
+                                                            className="bg-slate-800 hover:bg-slate-900 text-white w-full py-4 rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg transition-transform active:scale-[0.99] text-lg"
+                                                        >
+                                                            <Icons.Download /> SALVAR PDF / IMPRIMIR
+                                                        </button>
+                                                        <p className="text-center text-xs text-slate-500 mt-2">
+                                                            Ao clicar, selecione "Salvar como PDF" na janela de impressão do navegador.
+                                                        </p>
+                                                    </div>
+
+                                                </div>
+                                            ) : (
+                                                <EmptyState icon={Icons.FileText} message="Selecione um aluno" submessage="Para visualizar o relatório individual." />
+                                            )}
                                         </div>
                                     ) : (
-                                        <div className="fade-in">{getBatchStudents().length > 0 ? <div className="w-full bg-slate-300 p-8 rounded-xl overflow-auto shadow-inner space-y-8" id="report-preview-container">{getBatchStudents().map(student => <ReportPaper key={student.id} student={student} diagnosis={diagnoses.find(d => d.studentId === student.id)} checklist={checklists.filter(c => c.studentId === student.id).pop()} logs={logs.filter(l => l.studentId === student.id)} settings={settings} isBatch={true} />)}</div> : <EmptyState icon={Icons.Users} message="Nenhum aluno encontrado" submessage="Tente mudar o filtro de série." />}</div>
+                                        <div className="fade-in">
+                                            {getBatchStudents().length > 0 ? (
+                                                <div className="w-full bg-slate-300 p-8 rounded-xl overflow-auto shadow-inner space-y-8 flex flex-col items-center" id="report-preview-container">
+                                                    {getBatchStudents().map(student => (
+                                                        <ReportPaper
+                                                            key={student.id}
+                                                            student={student}
+                                                            diagnosis={diagnoses.find(d => d.studentId === student.id)}
+                                                            checklist={checklists.filter(c => c.studentId === student.id).pop()}
+                                                            logs={logs.filter(l => l.studentId === student.id)}
+                                                            settings={settings}
+                                                            isBatch={true}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <EmptyState icon={Icons.Users} message="Nenhum aluno encontrado" submessage="Tente mudar o filtro de série." />
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -871,11 +1005,11 @@
                                 <div className="space-y-6">
                                     <header><h2 className="text-2xl font-bold text-slate-800">Segurança de Dados</h2></header>
                                     <Card title="Backup e Exportação">
-                                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6 text-yellow-800 text-sm flex gap-2"><Icons.Info/> Lembre-se: Seus dados estão salvos apenas neste computador. Faça backup frequentemente.</div>
+                                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-6 text-yellow-800 text-sm flex gap-2"><Icons.Info /> Lembre-se: Seus dados estão salvos apenas neste computador. Faça backup frequentemente.</div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 shadow-md transition-colors"><Icons.Sheet/><span className="text-sm">EXPORTAR PLANILHA</span></button>
-                                            <button onClick={downloadBackup} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 shadow-md transition-colors"><Icons.Download/><span className="text-sm">BAIXAR BACKUP</span></button>
-                                            <label className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"><Icons.Upload/><span className="text-sm">RESTAURAR</span><input type="file" accept=".json" onChange={uploadBackup} className="hidden" /></label>
+                                            <button onClick={exportExcel} className="bg-green-600 hover:bg-green-700 text-white px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 shadow-md transition-colors"><Icons.Sheet /><span className="text-sm">EXPORTAR PLANILHA</span></button>
+                                            <button onClick={downloadBackup} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 shadow-md transition-colors"><Icons.Download /><span className="text-sm">BAIXAR BACKUP</span></button>
+                                            <label className="bg-white border-2 border-slate-200 text-slate-600 px-6 py-6 rounded-xl font-bold flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"><Icons.Upload /><span className="text-sm">RESTAURAR</span><input type="file" accept=".json" onChange={uploadBackup} className="hidden" /></label>
                                         </div>
                                     </Card>
                                 </div>
